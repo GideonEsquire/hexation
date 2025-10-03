@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hex Slide-Capture (p5.js)</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      background: #0f1115;
+      color: #e5e9f0;
+      font-family: system-ui, sans-serif;
+    }
+
+    #ui {
+      position: fixed;
+      inset: 12px auto auto 12px;
+      background: #181a20;
+      padding: 10px 12px;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #2a2f3a;
+      color: #e5e9f0;
+      font-weight: 600;
+    }
+
+    a {
+      color: #88c0d0;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    canvas {
+      display: block;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="ui">
+    <div><strong>Hex Slide-Capture (v2)</strong></div>
+    <div style="margin-top:6px">Turn: <span id="turn" class="badge">White</span></div>
+    <div style="margin-top:6px;font-size:13px;opacity:.85">
+      Click a piece ➜ click a highlighted hex. Slide any distance; land on enemy to capture.
+    </div>
+  </div>
+
+  <!-- p5.js -->
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.3/lib/p5.min.js"></script>
+  <script>
+    /* === Geometry & coordinates (axial) === */
+    const RADIUS = 4;                  // board radius (hexagon with 2*R+1 rows at widest)
+    const HEX_SIZE = 36;               // pixel radius of hex
+    const OUTLINE = 1.5;
+
+    const dirs = [                     // axial neighbor directions (pointy-top)
+      {q: +1, r: 0}, {q: +1, r: -1}, {q: 0, r: -1},
+      {q: -1, r: 0}, {q: -1, r: +1}, {q: 0, r: +1}
+    ];
+
+    function axialToPixel(q, r) {
+      const x = HEX_SIZE * (Math.sqrt(3) * q + Math.sqrt(3) / 2 * r);
+      const y = HEX_SIZE * (3 / 2 * r);
+      return {x, y};
+    }
+
+    function pixelToAxial(x, y) {
+      // inverse of axialToPixel using "pointy" orientation
+      const qf = (Math.sqrt(3) / 3 * x - 1 / 3 * y) / HEX_SIZE;
+      const rf = (2 / 3 * y) / HEX_SIZE;
+      return cubeRound(axialToCube(qf, rf));
+    }
+
+    function axialToCube(q, r) {return {x: q, y: -q - r, z: r};}
+    function cubeToAxial(x, y, z) {return {q: x, r: z};}
+    function cubeRound(c) {
+      let rx = Math.round(c.x), ry = Math.round(c.y), rz = Math.round(c.z);
+      const x_diff = Math.abs(rx - c.x);
+      const y_diff = Math.abs(ry - c.y);
+      const z_diff = Math.abs(rz - c.z);
+      if (x_diff > y_diff && x_diff > z_diff) rx = -ry - rz;
+      else if (y_diff > z_diff) ry = -rx - rz;
+      else rz = -rx - ry;
+      return cubeToAxial(rx, ry, rz);
+    }
+
+    function inBounds(q, r) {
+      return Math.abs(q) <= RADIUS && Math.abs(r) <= RADIUS && Math.abs(q + r) <= RADIUS;
+    }
+
+    /* === Game state === */
+    const State = {
+      // map "q,r" -> { side:'W'|'B' }
+      pieces: new Map(),
+      selected: null,    // {q,r} or null
+      legalMoves: [],    // [{to:{q,r}}]
+      turn: 'W',         // 'W' White, 'B' Black
+      winner: null
+    };
+
+    // Avoid p5's global "key" collision
+    function coordKey(q, r) {return `${q},${r}`;}
+    function getPiece(q, r) {return State.pieces.get(coordKey(q, r)) || null;}
+    function setPiece(q, r, p) {if (p) State.pieces.set(coordKey(q, r), p); else State.pieces.delete(coordKey(q, r));}
+
+    /* === Initial setup ===
+       Two rows per side, alternating cells, centered. No kings; all pieces identical. */
+    function setupPosition() {
+      State.pieces.clear();
+
+      // White rows near top
+      for (let r = -RADIUS + 1; r <= -RADIUS + 2; r++) {
+        for (let q = -RADIUS; q <= RADIUS; q++) {
+          if (!inBounds(q, r)) continue;
+          if (((q - r) & 1) === 0) setPiece(q, r, {side: 'W'});
+        }
+      }
+      // Black rows near bottom
+      for (let r = RADIUS - 1; r >= RADIUS - 2; r--) {
+        for (let q = -RADIUS; q <= RADIUS; q++) {
+          if (!inBounds(q, r)) continue;
+          if (((q - r) & 1) === 0) setPiece(q, r, {side: 'B'});
+        }
+      }
+
+      State.turn = 'W';
+      State.selected = null;
+      State.legalMoves = [];
+      State.winner = null;
+      updateTurnUI();
+    }
+
+    /* === Move generation: slide any distance; capture by landing === */
+    function legalMovesFrom(q, r) {
+      const piece = getPiece(q, r);
+      if (!piece || piece.side !== State.turn) return [];
+      const moves = [];
+
+      for (const d of dirs) {
+        let q2 = q + d.q, r2 = r + d.r;
+        while (inBounds(q2, r2)) {
+          const occ = getPiece(q2, r2);
+          if (!occ) {
+            // empty: can continue sliding
+            moves.push({to: {q: q2, r: r2}});
+          } else {
+            // occupied: can capture if enemy; then stop in this direction
+            if (occ.side !== piece.side) moves.push({to: {q: q2, r: r2}});
+            break;
+          }
+          q2 += d.q; r2 += d.r;
+        }
+      }
+
+      return moves;
+    }
+
+    /* === Apply moves === */
+    function applyMove(from, move) {
+      const src = getPiece(from.q, from.r);
+      if (!src) return;
+
+      const dst = getPiece(move.to.q, move.to.r);
+      if (dst && dst.side === src.side) return; // shouldn't happen; safety
+
+      // capture by replacement (if any)
+      setPiece(move.to.q, move.to.r, src);
+      setPiece(from.q, from.r, null);
+
+      switchTurn();
+
+      // Win check: if one side has no pieces
+      const hasW = [...State.pieces.values()].some(p => p.side === 'W');
+      const hasB = [...State.pieces.values()].some(p => p.side === 'B');
+      if (!hasW) State.winner = 'B';
+      if (!hasB) State.winner = 'W';
+    }
+
+    /* === Turn handling === */
+    function switchTurn() {
+      State.turn = (State.turn === 'W') ? 'B' : 'W';
+      updateTurnUI();
+    }
+    function updateTurnUI() {
+      const el = document.getElementById('turn');
+      el.textContent = State.winner ? (State.winner === 'W' ? 'White wins' : 'Black wins') : (State.turn === 'W' ? 'White' : 'Black');
+    }
+
+    /* === p5 sketch === */
+    let canvasW, canvasH, centerX, centerY;
+
+    function setup() {
+      canvasW = Math.max(720, Math.min(window.innerWidth, 1200));
+      canvasH = Math.max(640, Math.min(window.innerHeight, 1000));
+      createCanvas(canvasW, canvasH);
+
+      centerX = width / 2;
+      centerY = height / 2;
+
+      setupPosition();
+      noLoop();
+    }
+
+    function windowResized() {
+      canvasW = Math.max(720, Math.min(window.innerWidth, 1200));
+      canvasH = Math.max(640, Math.min(window.innerHeight, 1000));
+      resizeCanvas(canvasW, canvasH);
+      centerX = width / 2;
+      centerY = height / 2;
+      redraw();
+    }
+
+    function drawHex(x, y, size, fillCol, strokeCol) {
+      push();
+      translate(x, y);
+      stroke(strokeCol);
+      strokeWeight(OUTLINE);
+      fill(fillCol);
+      beginShape();
+      for (let i = 0; i < 6; i++) {
+        const angle = Math.PI / 180 * (60 * i - 30); // pointy-top
+        vertex(size * Math.cos(angle), size * Math.sin(angle));
+      }
+      endShape(CLOSE);
+      pop();
+    }
+
+    function drawPiece(x, y, p) {
+      push();
+      translate(x, y);
+      noStroke();
+      fill(p.side === 'W' ? '#eceff4' : '#3b4252');
+      circle(0, 0, HEX_SIZE * 1.05);
+      // side marker ring
+      noFill();
+      stroke(p.side === 'W' ? '#2e3440' : '#d8dee9');
+      strokeWeight(3);
+      circle(0, 0, HEX_SIZE * 0.7);
+      pop();
+    }
+
+    function boardCells() {
+      const cells = [];
+      for (let r = -RADIUS; r <= RADIUS; r++) {
+        for (let q = -RADIUS; q <= RADIUS; q++) {
+          if (!inBounds(q, r)) continue;
+          const {x, y} = axialToPixel(q, r);
+          cells.push({q, r, x: centerX + x, y: centerY + y});
+        }
+      }
+      return cells;
+    }
+
+    function mouseToAxial() {
+      const localX = mouseX - centerX;
+      const localY = mouseY - centerY;
+      const {q, r} = pixelToAxial(localX, localY);
+      return inBounds(q, r) ? {q, r} : null;
+    }
+
+    function draw() {
+      background('#0f1115');
+
+      const cells = boardCells();
+
+      // board
+      for (const c of cells) {
+        let fillCol = '#1b1f27';
+        const isSel = State.selected && State.selected.q === c.q && State.selected.r === c.r;
+        if (isSel) fillCol = '#293141';
+
+        // light/dark pattern (parity)
+        const parity = (c.q - c.r) & 1;
+        if (!isSel && parity === 0) fillCol = '#202633';
+
+        drawHex(c.x, c.y, HEX_SIZE, fillCol, '#2d3442');
+      }
+
+      // legal move highlights
+      for (const mv of State.legalMoves) {
+        const {x, y} = axialToPixel(mv.to.q, mv.to.r);
+        push();
+        translate(centerX + x, centerY + y);
+        stroke('#88c0d0');
+        strokeWeight(3);
+        noFill();
+        polygon(HEX_SIZE * 0.82);
+        pop();
+      }
+
+      // pieces
+      for (const c of cells) {
+        const p = getPiece(c.q, c.r);
+        if (p) drawPiece(c.x, c.y, p);
+      }
+
+      // hover ring
+      const a = mouseToAxial();
+      if (a) {
+        const {x, y} = axialToPixel(a.q, a.r);
+        push();
+        translate(centerX + x, centerY + y);
+        noFill();
+        stroke('#5e81ac');
+        strokeWeight(2);
+        polygon(HEX_SIZE * 0.9);
+        pop();
+      }
+    }
+
+    function polygon(radius) {
+      beginShape();
+      for (let i = 0; i < 6; i++) {
+        const ang = Math.PI / 180 * (60 * i - 30);
+        vertex(radius * Math.cos(ang), radius * Math.sin(ang));
+      }
+      endShape(CLOSE);
+    }
+
+    /* === Input === */
+    function mousePressed() {
+      if (State.winner) return;
+      const a = mouseToAxial();
+      if (!a) return;
+
+      const clickedPiece = getPiece(a.q, a.r);
+
+      // If clicking one of your pieces: (re)select & show its moves
+      if (clickedPiece && clickedPiece.side === State.turn) {
+        State.selected = {q: a.q, r: a.r};
+        State.legalMoves = legalMovesFrom(a.q, a.r);
+        redraw();
+        return;
+      }
+
+      // If clicking an empty cell or enemy and we have a selection: try move
+      if (State.selected) {
+        const mv = State.legalMoves.find(m => m.to.q === a.q && m.to.r === a.r);
+        if (mv) {
+          applyMove(State.selected, mv);
+          State.selected = null;
+          State.legalMoves = [];
+          redraw();
+          return;
+        }
+      }
+    }
+
+  </script>
+</body>
+
+</html>
