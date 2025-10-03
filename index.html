@@ -53,6 +53,12 @@
   <div id="ui">
     <div><strong>Hex Slide-Capture (v2)</strong></div>
     <div style="margin-top:6px">Turn: <span id="turn" class="badge">White</span></div>
+    <div id="resetWrap" style="margin-top:8px; display:none;">
+      <button id="resetBtn" style="background:#2e3440;color:#eceff4;border:none;padding:6px 12px;
+           border-radius:6px;cursor:pointer;font-weight:600;">
+        Reset Game
+      </button>
+    </div>
     <div style="margin-top:6px;font-size:13px;opacity:.85">
       Click a piece ➜ click a highlighted hex. Slide any distance; land on enemy to capture.
     </div>
@@ -208,20 +214,29 @@
       const src = getPiece(from.q, from.r);
       if (!src) return;
 
-      const dst = getPiece(move.to.q, move.to.r);
-      if (dst && dst.side === src.side) return; // shouldn't happen; safety
+      const moverSide = src.side;
+      const captured = getPiece(move.to.q, move.to.r); // may be null
 
-      // capture by replacement (if any)
+      // move (capture by replacement if occupied)
       setPiece(move.to.q, move.to.r, src);
       setPiece(from.q, from.r, null);
 
-      switchTurn();
+      // sudden-death: if a queen was captured, mover wins instantly
+      if (captured && captured.type === 'Q') {
+        State.winner = moverSide;      // the mover just captured the enemy queen
+        updateTurnUI();
+        return;                        // stop here; no further checks or turn switch
+      }
 
-      // Win check: if one side has no pieces
+      // (optional) keep your old fallback win condition if you like:
+      // side with zero pieces loses
       const hasW = [...State.pieces.values()].some(p => p.side === 'W');
       const hasB = [...State.pieces.values()].some(p => p.side === 'B');
-      if (!hasW) State.winner = 'B';
-      if (!hasB) State.winner = 'W';
+      if (!hasW) {State.winner = 'B'; updateTurnUI(); return;}
+      if (!hasB) {State.winner = 'W'; updateTurnUI(); return;}
+
+      // otherwise, normal turn switch
+      switchTurn();
     }
 
     /* === Turn handling === */
@@ -229,9 +244,15 @@
       State.turn = (State.turn === 'W') ? 'B' : 'W';
       updateTurnUI();
     }
+
     function updateTurnUI() {
       const el = document.getElementById('turn');
-      el.textContent = State.winner ? (State.winner === 'W' ? 'White wins' : 'Black wins') : (State.turn === 'W' ? 'White' : 'Black');
+      el.textContent = State.winner
+        ? (State.winner === 'W' ? 'White wins' : 'Black wins')
+        : (State.turn === 'W' ? 'White' : 'Black');
+
+      // show/hide reset button
+      document.getElementById('resetWrap').style.display = State.winner ? 'block' : 'none';
     }
 
     /* === p5 sketch === */
@@ -406,7 +427,11 @@
         }
       }
     }
-
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      setupPosition();
+      redraw();
+      document.getElementById('resetWrap').style.display = 'none';
+    });
   </script>
 </body>
 
