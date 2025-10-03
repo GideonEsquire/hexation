@@ -132,7 +132,7 @@
       for (let r = -RADIUS + 1; r <= -RADIUS + 2; r++) {
         for (let q = -RADIUS; q <= RADIUS; q++) {
           if (!inBounds(q, r)) continue;
-          if (((q - r) & 1) === 0) setPiece(q, r, {side: 'W'});
+          if (((q - r) & 1) === 0) setPiece(q, r, {side: 'W', type: 'S'});
         }
       }
       // Black rows near bottom
@@ -148,6 +148,25 @@
       State.legalMoves = [];
       State.winner = null;
       updateTurnUI();
+
+      // Add Queens (one-step movers) on back-center if open, else first empty on that row
+      function placeQueen(side, rRow) {
+        let placed = false;
+        if (inBounds(0, rRow) && !getPiece(0, rRow)) {
+          setPiece(0, rRow, {side, type: 'Q'});
+          placed = true;
+        }
+        if (!placed) {
+          for (let q = -RADIUS; q <= RADIUS; q++) {
+            if (inBounds(q, rRow) && !getPiece(q, rRow)) {
+              setPiece(q, rRow, {side, type: 'Q'});
+              break;
+            }
+          }
+        }
+      }
+      placeQueen('W', -RADIUS);
+      placeQueen('B', RADIUS);
     }
 
     /* === Move generation: slide any distance; capture by landing === */
@@ -156,19 +175,28 @@
       if (!piece || piece.side !== State.turn) return [];
       const moves = [];
 
-      for (const d of dirs) {
-        let q2 = q + d.q, r2 = r + d.r;
-        while (inBounds(q2, r2)) {
+      if (piece.type === 'Q') {
+        // One-step in any of the 6 directions (capture by landing)
+        for (const d of dirs) {
+          const q2 = q + d.q, r2 = r + d.r;
+          if (!inBounds(q2, r2)) continue;
           const occ = getPiece(q2, r2);
-          if (!occ) {
-            // empty: can continue sliding
-            moves.push({to: {q: q2, r: r2}});
-          } else {
-            // occupied: can capture if enemy; then stop in this direction
-            if (occ.side !== piece.side) moves.push({to: {q: q2, r: r2}});
-            break;
+          if (!occ || occ.side !== piece.side) moves.push({to: {q: q2, r: r2}});
+        }
+      } else {
+        // 'S' slider — keep your existing sliding behavior
+        for (const d of dirs) {
+          let q2 = q + d.q, r2 = r + d.r;
+          while (inBounds(q2, r2)) {
+            const occ = getPiece(q2, r2);
+            if (!occ) {
+              moves.push({to: {q: q2, r: r2}});
+            } else {
+              if (occ.side !== piece.side) moves.push({to: {q: q2, r: r2}});
+              break;
+            }
+            q2 += d.q; r2 += d.r;
           }
-          q2 += d.q; r2 += d.r;
         }
       }
 
@@ -251,11 +279,25 @@
       noStroke();
       fill(p.side === 'W' ? '#eceff4' : '#3b4252');
       circle(0, 0, HEX_SIZE * 1.05);
-      // side marker ring
+
+      // side ring
       noFill();
       stroke(p.side === 'W' ? '#2e3440' : '#d8dee9');
       strokeWeight(3);
       circle(0, 0, HEX_SIZE * 0.7);
+
+      if (p.type === 'Q') {
+        // queen marker: small hex glyph inside
+        strokeWeight(2.5);
+        const r = HEX_SIZE * 0.35;
+        beginShape();
+        for (let i = 0; i < 6; i++) {
+          const ang = Math.PI / 180 * (60 * i - 30);
+          const vx = r * Math.cos(ang), vy = r * Math.sin(ang);
+          vertex(vx, vy);
+        }
+        endShape(CLOSE);
+      }
       pop();
     }
 
