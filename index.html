@@ -97,6 +97,13 @@
       return cubeToAxial(rx, ry, rz);
     }
 
+    // 3-color palette for base tiles
+    const TRI_COLORS = ['#1b1f27', '#202633', '#242b39']; // tweak freely
+
+    function triColorIndex(q, r) {
+      return ((q - r) % 3 + 3) % 3; // 0,1,2 repeating
+    }
+
     function inBounds(q, r) {
       return Math.abs(q) <= RADIUS && Math.abs(r) <= RADIUS && Math.abs(q + r) <= RADIUS;
     }
@@ -278,13 +285,12 @@
 
       // board
       for (const c of cells) {
-        let fillCol = '#1b1f27';
+        // base 3-coloring
+        let fillCol = TRI_COLORS[triColorIndex(c.q, c.r)];
+
+        // selection tint (overlay style so base color still matters)
         const isSel = State.selected && State.selected.q === c.q && State.selected.r === c.r;
         if (isSel) fillCol = '#293141';
-
-        // light/dark pattern (parity)
-        const parity = (c.q - c.r) & 1;
-        if (!isSel && parity === 0) fillCol = '#202633';
 
         drawHex(c.x, c.y, HEX_SIZE, fillCol, '#2d3442');
       }
