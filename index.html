@@ -195,14 +195,21 @@
     }
 
     function legalPlacementHexes() {
-      if (State.winner) return [];
-      if (State.phase === 'play') return [];
+      if (State.winner || State.phase === 'play') return [];
 
       const spots = [];
       for (let r = -RADIUS; r <= RADIUS; r++) {
         for (let q = -RADIUS; q <= RADIUS; q++) {
           if (!inBounds(q, r) || !isPerimeter(q, r)) continue;
-          if (!getPiece(q, r)) spots.push({q, r});
+          const occ = getPiece(q, r);
+
+          if (State.phase === 'place_queen') {
+            if (!occ) spots.push({q, r, kind: 'empty'});
+          } else if (State.phase === 'place_drones') {
+            if (!occ) spots.push({q, r, kind: 'empty'});
+            else if (occ.side === State.turn && occ.type === 'D')
+              spots.push({q, r, kind: 'stack'});
+          }
         }
       }
       return spots;
@@ -428,6 +435,22 @@
           pop();
         }
       }
+
+      if (State.phase !== 'play') {
+        const targets = legalPlacementHexes();
+        for (const t of targets) {
+          const {x, y} = axialToPixel(t.q, t.r);
+          push();
+          translate(centerX + x, centerY + y);
+          noFill();
+          // green for empty placements, gold for stackable
+          stroke(t.kind === 'stack' ? '#ebcb8b' : '#a3be8c');
+          strokeWeight(3);
+          polygon(HEX_SIZE * 0.82);
+          pop();
+        }
+      }
+
       // legal move highlights
       for (const mv of State.legalMoves) {
         const {x, y} = axialToPixel(mv.to.q, mv.to.r);
@@ -477,13 +500,15 @@
 
       // --- Placement phase ---
       if (State.phase !== 'play') {
-        // must be empty perimeter hex
-        if (!isPerimeter(a.q, a.r) || getPiece(a.q, a.r)) return;
+        if (!isPerimeter(a.q, a.r)) return; // perimeter only
+
+        const occ = getPiece(a.q, a.r);
 
         if (State.phase === 'place_queen') {
-          // place this side's Queen
+          // Queen must go on an EMPTY perimeter hex
+          if (occ) return;
           const P = State.placements[State.turn];
-          if (P.queenPlaced) return; // shouldn't happen
+          if (P.queenPlaced) return; // safety
           setPiece(a.q, a.r, {side: State.turn, type: 'Q', size: 1});
           P.queenPlaced = true;
           State.selected = null;
@@ -497,18 +522,15 @@
           const P = State.placements[State.turn];
           if (P.dronesPlaced >= DRONES_PER_SIDE) return;
 
-          const existing = getPiece(a.q, a.r);
-          // Must be perimeter (already checked above), and:
-          // - empty: create size 1 Drone
-          // - friendly Drone: stack (size += 1)
-          // - otherwise: illegal
-          if (!existing) {
+          if (!occ) {
+            // empty perimeter: place a fresh Drone
             setPiece(a.q, a.r, {side: State.turn, type: 'D', size: 1});
-          } else if (existing.side === State.turn && existing.type === 'D') {
-            const grown = {...existing, size: (existing.size || 1) + 1};
-            setPiece(a.q, a.r, grown);
+          } else if (occ.side === State.turn && occ.type === 'D') {
+            // STACKING: grow your own Drone
+            setPiece(a.q, a.r, {...occ, size: (occ.size || 1) + 1});
           } else {
-            return; // can't place on enemy or queen (yours or theirs)
+            // can't place on enemy or any queen
+            return;
           }
 
           P.dronesPlaced += 1;
