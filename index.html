@@ -71,6 +71,12 @@
     const RADIUS = 5;                  // board radius (hexagon with 2*R+1 rows at widest)
     const HEX_SIZE = 36;               // pixel radius of hex
     const OUTLINE = 1.5;
+    const DRONES_PER_SIDE = 6; // tweak to your liking
+
+    function isPerimeter(q, r) {
+      // A hex is on the perimeter if any of |q|, |r|, |q+r| equals RADIUS
+      return Math.abs(q) === RADIUS || Math.abs(r) === RADIUS || Math.abs(q + r) === RADIUS;
+    }
 
     const dirs = [                     // axial neighbor directions (pointy-top)
       {q: +1, r: 0}, {q: +1, r: -1}, {q: 0, r: -1},
@@ -116,12 +122,18 @@
 
     /* === Game state === */
     const State = {
-      // map "q,r" -> { side:'W'|'B' }
-      pieces: new Map(),
-      selected: null,    // {q,r} or null
-      legalMoves: [],    // [{to:{q,r}}]
-      turn: 'W',         // 'W' White, 'B' Black
-      winner: null
+      pieces: new Map(),                 // "q,r" -> { side:'W'|'B', type:'Q'|'D' }
+      selected: null,
+      legalMoves: [],                    // for play phase
+      turn: 'W',
+      winner: null,
+
+      // placement phase control
+      phase: 'place_queen',              // 'place_queen' | 'place_drones' | 'play'
+      placements: {
+        W: {queenPlaced: false, dronesPlaced: 0},
+        B: {queenPlaced: false, dronesPlaced: 0},
+      }
     };
 
     // Avoid p5's global "key" collision
@@ -129,84 +141,102 @@
     function getPiece(q, r) {return State.pieces.get(coordKey(q, r)) || null;}
     function setPiece(q, r, p) {if (p) State.pieces.set(coordKey(q, r), p); else State.pieces.delete(coordKey(q, r));}
 
-    /* === Initial setup ===
-       Two rows per side, alternating cells, centered. No kings; all pieces identical. */
+    /* === Initial setup === */
     function setupPosition() {
       State.pieces.clear();
-
-      // White rows near top
-      for (let r = -RADIUS + 1; r <= -RADIUS + 2; r++) {
-        for (let q = -RADIUS; q <= RADIUS; q++) {
-          if (!inBounds(q, r)) continue;
-          if (((q - r) & 1) === 0) setPiece(q, r, {side: 'W', type: 'S'});
-        }
-      }
-      // Black rows near bottom
-      for (let r = RADIUS - 1; r >= RADIUS - 2; r--) {
-        for (let q = -RADIUS; q <= RADIUS; q++) {
-          if (!inBounds(q, r)) continue;
-          if (((q - r) & 1) === 0) setPiece(q, r, {side: 'B'});
-        }
-      }
 
       State.turn = 'W';
       State.selected = null;
       State.legalMoves = [];
       State.winner = null;
-      updateTurnUI();
 
-      // Add Queens (one-step movers) on back-center if open, else first empty on that row
-      function placeQueen(side, rRow) {
-        let placed = false;
-        if (inBounds(0, rRow) && !getPiece(0, rRow)) {
-          setPiece(0, rRow, {side, type: 'Q'});
-          placed = true;
-        }
-        if (!placed) {
-          for (let q = -RADIUS; q <= RADIUS; q++) {
-            if (inBounds(q, rRow) && !getPiece(q, rRow)) {
-              setPiece(q, rRow, {side, type: 'Q'});
-              break;
-            }
-          }
-        }
-      }
-      placeQueen('W', -RADIUS);
-      placeQueen('B', RADIUS);
+      State.phase = 'place_queen';
+      State.placements = {
+        W: {queenPlaced: false, dronesPlaced: 0},
+        B: {queenPlaced: false, dronesPlaced: 0},
+      };
+
+      updateTurnUI();
     }
 
     /* === Move generation: slide any distance; capture by landing === */
     function legalMovesFrom(q, r) {
+      if (State.phase !== 'play') return [];  // no movement during placement
+
       const piece = getPiece(q, r);
       if (!piece || piece.side !== State.turn) return [];
       const moves = [];
 
       if (piece.type === 'Q') {
-        // One-step in any of the 6 directions (capture by landing)
+        // Queen: one-step in any direction
         for (const d of dirs) {
           const q2 = q + d.q, r2 = r + d.r;
           if (!inBounds(q2, r2)) continue;
           const occ = getPiece(q2, r2);
           if (!occ || occ.side !== piece.side) moves.push({to: {q: q2, r: r2}});
         }
-      } else {
-        // 'S' slider — keep your existing sliding behavior
+      } else if (piece.type === 'D') {
+        // Drone: slide any distance in any direction
         for (const d of dirs) {
           let q2 = q + d.q, r2 = r + d.r;
           while (inBounds(q2, r2)) {
             const occ = getPiece(q2, r2);
-            if (!occ) {
-              moves.push({to: {q: q2, r: r2}});
-            } else {
-              if (occ.side !== piece.side) moves.push({to: {q: q2, r: r2}});
-              break;
-            }
+            if (!occ) moves.push({to: {q: q2, r: r2}});
+            else {if (occ.side !== piece.side) moves.push({to: {q: q2, r: r2}}); break;}
             q2 += d.q; r2 += d.r;
           }
         }
       }
 
       return moves;
+    }
+
+    function legalPlacementHexes() {
+      if (State.winner) return [];
+      if (State.phase === 'play') return [];
+
+      const spots = [];
+      for (let r = -RADIUS; r <= RADIUS; r++) {
+        for (let q = -RADIUS; q <= RADIUS; q++) {
+          if (!inBounds(q, r) || !isPerimeter(q, r)) continue;
+          if (!getPiece(q, r)) spots.push({q, r});
+        }
+      }
+      return spots;
+    }
+
+    function sideNeedsPlacement(side) {
+      const P = State.placements[side];
+      if (State.phase === 'place_queen') return !P.queenPlaced;
+      if (State.phase === 'place_drones') return P.dronesPlaced < DRONES_PER_SIDE;
+      return false;
+    }
+
+    function advancePlacementTurn() {
+      // Move to next phase if queens done
+      if (State.phase === 'place_queen') {
+        const allQueens = State.placements.W.queenPlaced && State.placements.B.queenPlaced;
+        if (allQueens) State.phase = 'place_drones';
+      }
+
+      // If drones phase finished for both, enter play
+      if (State.phase === 'place_drones') {
+        const Wdone = State.placements.W.dronesPlaced >= DRONES_PER_SIDE;
+        const Bdone = State.placements.B.dronesPlaced >= DRONES_PER_SIDE;
+        if (Wdone && Bdone) {State.phase = 'play'; return;}
+      }
+
+      // Otherwise, find the next side that still has placement to do (alternate, but skip finished)
+      const other = (State.turn === 'W') ? 'B' : 'W';
+      if (sideNeedsPlacement(other)) State.turn = other;
+      else if (sideNeedsPlacement(State.turn)) {/* stay on current */}
+      else {
+        // Edge case: current side finished but other also finished (should be caught above),
+        // or one side finished earlier — keep giving turns to the side that still has placements.
+        if (sideNeedsPlacement('W')) State.turn = 'W';
+        else if (sideNeedsPlacement('B')) State.turn = 'B';
+      }
+      updateTurnUI();
     }
 
     /* === Apply moves === */
@@ -247,12 +277,21 @@
 
     function updateTurnUI() {
       const el = document.getElementById('turn');
-      el.textContent = State.winner
-        ? (State.winner === 'W' ? 'White wins' : 'Black wins')
-        : (State.turn === 'W' ? 'White' : 'Black');
 
-      // show/hide reset button
-      document.getElementById('resetWrap').style.display = State.winner ? 'block' : 'none';
+      if (State.winner) {
+        el.textContent = (State.winner === 'W' ? 'White wins' : 'Black wins');
+      } else if (State.phase === 'place_queen') {
+        el.textContent = (State.turn === 'W' ? 'White' : 'Black') + ' — place QUEEN';
+      } else if (State.phase === 'place_drones') {
+        const P = State.placements[State.turn];
+        el.textContent = (State.turn === 'W' ? 'White' : 'Black') + ` — place DRONE (${P.dronesPlaced + 1}/${DRONES_PER_SIDE})`;
+      } else {
+        el.textContent = (State.turn === 'W' ? 'White' : 'Black');
+      }
+
+      // if you added the reset button earlier:
+      const wrap = document.getElementById('resetWrap');
+      if (wrap) wrap.style.display = State.winner ? 'block' : 'none';
     }
 
     /* === p5 sketch === */
@@ -358,6 +397,20 @@
         drawHex(c.x, c.y, HEX_SIZE, fillCol, '#2d3442');
       }
 
+      // Placement targets highlight
+      if (State.phase !== 'play') {
+        const targets = legalPlacementHexes();
+        for (const t of targets) {
+          const {x, y} = axialToPixel(t.q, t.r);
+          push();
+          translate(centerX + x, centerY + y);
+          noFill();
+          stroke('#a3be8c');   // green ring for placement
+          strokeWeight(3);
+          polygon(HEX_SIZE * 0.82);
+          pop();
+        }
+      }
       // legal move highlights
       for (const mv of State.legalMoves) {
         const {x, y} = axialToPixel(mv.to.q, mv.to.r);
@@ -405,9 +458,41 @@
       const a = mouseToAxial();
       if (!a) return;
 
+      // --- Placement phase ---
+      if (State.phase !== 'play') {
+        // must be empty perimeter hex
+        if (!isPerimeter(a.q, a.r) || getPiece(a.q, a.r)) return;
+
+        if (State.phase === 'place_queen') {
+          // place this side's Queen
+          const P = State.placements[State.turn];
+          if (P.queenPlaced) return; // shouldn't happen
+          setPiece(a.q, a.r, {side: State.turn, type: 'Q'});
+          P.queenPlaced = true;
+          State.selected = null;
+          State.legalMoves = [];
+          advancePlacementTurn();
+          redraw();
+          return;
+        }
+
+        if (State.phase === 'place_drones') {
+          // place one Drone for this side
+          const P = State.placements[State.turn];
+          if (P.dronesPlaced >= DRONES_PER_SIDE) return;
+          setPiece(a.q, a.r, {side: State.turn, type: 'D'});
+          P.dronesPlaced += 1;
+          State.selected = null;
+          State.legalMoves = [];
+          advancePlacementTurn();
+          redraw();
+          return;
+        }
+      }
+
+      // --- Normal play phase below ---
       const clickedPiece = getPiece(a.q, a.r);
 
-      // If clicking one of your pieces: (re)select & show its moves
       if (clickedPiece && clickedPiece.side === State.turn) {
         State.selected = {q: a.q, r: a.r};
         State.legalMoves = legalMovesFrom(a.q, a.r);
@@ -415,7 +500,6 @@
         return;
       }
 
-      // If clicking an empty cell or enemy and we have a selection: try move
       if (State.selected) {
         const mv = State.legalMoves.find(m => m.to.q === a.q && m.to.r === a.r);
         if (mv) {
@@ -427,6 +511,7 @@
         }
       }
     }
+
     document.getElementById('resetBtn').addEventListener('click', () => {
       setupPosition();
       redraw();
