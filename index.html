@@ -72,7 +72,11 @@
     const HEX_SIZE = 36;               // pixel radius of hex
     const OUTLINE = 1.5;
     const DRONES_PER_SIDE = 6; // tweak to your liking
+    const MAX_STACK = 5;
 
+    function isCenter(q, r) {
+      return q === 0 && r === 0;
+    }
     function isPerimeter(q, r) {
       // A hex is on the perimeter if any of |q|, |r|, |q+r| equals RADIUS
       return Math.abs(q) === RADIUS || Math.abs(r) === RADIUS || Math.abs(q + r) === RADIUS;
@@ -210,6 +214,13 @@
             else if (occ.side === State.turn && occ.type === 'D')
               spots.push({q, r, kind: 'stack'});
           }
+          // in legalPlacementHexes()
+          else if (State.phase === 'place_drones') {
+            if (!occ) spots.push({q, r, kind: 'empty'});
+            else if (occ.side === State.turn && occ.type === 'D' && (occ.size || 1) < MAX_STACK)
+              spots.push({q, r, kind: 'stack'});
+          }
+
         }
       }
       return spots;
@@ -223,29 +234,36 @@
     }
 
     function advancePlacementTurn() {
-      // Move to next phase if queens done
+      // Move to next phase if both queens placed
       if (State.phase === 'place_queen') {
-        const allQueens = State.placements.W.queenPlaced && State.placements.B.queenPlaced;
-        if (allQueens) State.phase = 'place_drones';
+        if (State.placements.W.queenPlaced && State.placements.B.queenPlaced) {
+          State.phase = 'place_drones';
+        }
       }
 
-      // If drones phase finished for both, enter play
+      // If both finished drones, enter play
       if (State.phase === 'place_drones') {
         const Wdone = State.placements.W.dronesPlaced >= DRONES_PER_SIDE;
         const Bdone = State.placements.B.dronesPlaced >= DRONES_PER_SIDE;
-        if (Wdone && Bdone) {State.phase = 'play'; return;}
+        if (Wdone && Bdone) {
+          State.phase = 'play';
+          updateTurnUI();
+          return;
+        }
       }
 
-      // Otherwise, find the next side that still has placement to do (alternate, but skip finished)
+      // Alternate turns, but skip a side that’s finished its placements
       const other = (State.turn === 'W') ? 'B' : 'W';
-      if (sideNeedsPlacement(other)) State.turn = other;
-      else if (sideNeedsPlacement(State.turn)) {/* stay on current */}
-      else {
-        // Edge case: current side finished but other also finished (should be caught above),
-        // or one side finished earlier — keep giving turns to the side that still has placements.
+      if (sideNeedsPlacement(other)) {
+        State.turn = other;
+      } else if (sideNeedsPlacement(State.turn)) {
+        // stay
+      } else {
+        // if current is done but other still needs, hand it to them
         if (sideNeedsPlacement('W')) State.turn = 'W';
         else if (sideNeedsPlacement('B')) State.turn = 'B';
       }
+
       updateTurnUI();
     }
 
@@ -261,21 +279,34 @@
       setPiece(move.to.q, move.to.r, src);
       setPiece(from.q, from.r, null);
 
-      // sudden-death: if a queen was captured, mover wins instantly
+      // queen-capture sudden death (existing rule)
       if (captured && captured.type === 'Q') {
-        State.winner = moverSide;      // the mover just captured the enemy queen
+        State.winner = moverSide;
         updateTurnUI();
-        return;                        // stop here; no further checks or turn switch
+        return;
       }
 
-      // (optional) keep your old fallback win condition if you like:
-      // side with zero pieces loses
+      // --- Center-cell effects ---
+      if (isCenter(move.to.q, move.to.r)) {
+        const landed = getPiece(move.to.q, move.to.r);
+        if (landed.type === 'Q') {
+          // Queen reaches center: instant win
+          State.winner = moverSide;
+          updateTurnUI();
+          return;
+        } else if (landed.type === 'D') {
+          // Drone reaches center: upgrade to max stack
+          landed.size = MAX_STACK;
+          setPiece(move.to.q, move.to.r, landed);
+        }
+      }
+
+      // (optional) fallback win by elimination
       const hasW = [...State.pieces.values()].some(p => p.side === 'W');
       const hasB = [...State.pieces.values()].some(p => p.side === 'B');
       if (!hasW) {State.winner = 'B'; updateTurnUI(); return;}
       if (!hasB) {State.winner = 'W'; updateTurnUI(); return;}
 
-      // otherwise, normal turn switch
       switchTurn();
     }
 
@@ -419,6 +450,17 @@
         if (isSel) fillCol = '#293141';
 
         drawHex(c.x, c.y, HEX_SIZE, fillCol, '#2d3442');
+        const isCenterHex = (c.q === 0 && c.r === 0);
+        if (isCenterHex) {
+          // overlay ring
+          push();
+          translate(c.x, c.y);
+          noFill();
+          stroke('#242b39'); // or any accent
+          strokeWeight(3);
+          polygon(HEX_SIZE * 0.88);
+          pop();
+        }
       }
 
       // Placement targets highlight
@@ -498,24 +540,23 @@
       const a = mouseToAxial();
       if (!a) return;
 
-      // --- Placement phase ---
+      // === PLACEMENT PHASE ===
       if (State.phase !== 'play') {
-        if (!isPerimeter(a.q, a.r)) return; // perimeter only
-
+        if (!isPerimeter(a.q, a.r)) return;            // perimeter only
         const occ = getPiece(a.q, a.r);
 
         if (State.phase === 'place_queen') {
-          // Queen must go on an EMPTY perimeter hex
+          // Queen must go on EMPTY perimeter
           if (occ) return;
           const P = State.placements[State.turn];
-          if (P.queenPlaced) return; // safety
+          if (P.queenPlaced) return;                   // safety
           setPiece(a.q, a.r, {side: State.turn, type: 'Q', size: 1});
           P.queenPlaced = true;
           State.selected = null;
           State.legalMoves = [];
-          advancePlacementTurn();
+          advancePlacementTurn();                      // may switch side / phase
           redraw();
-          return;
+          return;                                      // <<< DO NOT FALL THROUGH
         }
 
         if (State.phase === 'place_drones') {
@@ -523,14 +564,14 @@
           if (P.dronesPlaced >= DRONES_PER_SIDE) return;
 
           if (!occ) {
-            // empty perimeter: place a fresh Drone
             setPiece(a.q, a.r, {side: State.turn, type: 'D', size: 1});
           } else if (occ.side === State.turn && occ.type === 'D') {
-            // STACKING: grow your own Drone
-            setPiece(a.q, a.r, {...occ, size: (occ.size || 1) + 1});
+            // stack up to max
+            const next = Math.min(MAX_STACK, (occ.size || 1) + 1);
+            if (next === (occ.size || 1)) return;      // at cap
+            setPiece(a.q, a.r, {...occ, size: next});
           } else {
-            // can't place on enemy or any queen
-            return;
+            return;                                    // can't place on enemy or queen
           }
 
           P.dronesPlaced += 1;
@@ -538,11 +579,13 @@
           State.legalMoves = [];
           advancePlacementTurn();
           redraw();
-          return;
+          return;                                      // <<< DO NOT FALL THROUGH
         }
+
+        return; // safety
       }
 
-      // --- Normal play phase below ---
+      // === PLAY PHASE ===
       const clickedPiece = getPiece(a.q, a.r);
 
       if (clickedPiece && clickedPiece.side === State.turn) {
