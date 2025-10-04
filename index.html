@@ -89,7 +89,7 @@
 
 <body>
   <div id="ui">
-    <div><strong>Hex Slide-Capture (v2)</strong></div>
+    <div><strong>Hexation (v0.2)</strong></div>
     <div style="margin-top:6px">Turn: <span id="turn" class="badge">White</span></div>
     <div id="resetWrap" style="margin-top:8px; display:none;">
       <button id="resetBtn" style="background:#2e3440;color:#eceff4;border:none;padding:6px 12px;
@@ -177,6 +177,7 @@
       selected: null,
       legalMoves: [],
       turn: 'W',
+      centerClaimOwner: null,  // 'W' | 'B' | null
       winner: null,
       placeMode: false,
       placements: {
@@ -193,19 +194,6 @@
       return Math.max(0, DRONES_PER_SIDE - (P?.dronesPlaced || 0));
     }
 
-    function keyPressed() {
-      // Toggle place mode with 'P'
-      if (key === 'p' || key === 'P') {
-        State.placeMode = !State.placeMode;
-        redraw();
-      }
-      // Esc clears selection
-      if (keyCode === ESCAPE) {
-        State.selected = null;
-        State.legalMoves = [];
-        redraw();
-      }
-    }
     function isPlaceIntent() {
       // Shift held OR manual toggle
       return (typeof keyIsDown === 'function' && keyIsDown(16)) || State.placeMode; // 16 = SHIFT
@@ -222,6 +210,7 @@
       State.selected = null;
       State.legalMoves = [];
       State.winner = null;
+      State.centerClaimOwner = null;
       State.placements = {
         W: {queenPlaced: false, dronesPlaced: 0},
         B: {queenPlaced: false, dronesPlaced: 0},
@@ -298,34 +287,54 @@
       setPiece(move.to.q, move.to.r, src);
       setPiece(from.q, from.r, null);
 
-      // queen-capture sudden death (existing rule)
+      // queen-capture sudden death (unchanged)
       if (captured && captured.type === 'Q') {
         State.winner = moverSide;
         updateTurnUI();
         return;
       }
 
-      // --- Center-cell effects ---
-      if (isCenter(move.to.q, move.to.r)) {
-        const landed = getPiece(move.to.q, move.to.r);
-        if (landed.type === 'Q') {
-          // Queen reaches center: instant win
-          State.winner = moverSide;
-          updateTurnUI();
-          return;
-        } else if (landed.type === 'D') {
-          // Drone reaches center: upgrade to max stack
-          landed.size = MAX_STACK;
-          setPiece(move.to.q, move.to.r, landed);
-        }
+      // --- Center-cell effects (no instant wins here) ---
+      const landed = getPiece(move.to.q, move.to.r); // the piece now on destination
+
+      // Drone upgrade on center
+      if (landed && landed.type === 'D' && isCenter(move.to.q, move.to.r)) {
+        const newSize = typeof landed.size === 'number' ? Math.max(landed.size, MAX_STACK) : MAX_STACK;
+        setPiece(move.to.q, move.to.r, {...landed, size: newSize});
       }
 
-      // (optional) fallback win by elimination
+      // Claim / hold logic for the center:
+      // - If a queen occupies center at end of the turn, she "claims" it for her side.
+      // - If the *other* side just finished their turn and the claim still stands, the claimer wins.
+      const center = getPiece(0, 0);
+      if (center && center.type === 'Q') {
+        const queenSide = center.side;
+
+        if (State.centerClaimOwner === queenSide) {
+          // The same side still owns the claim.
+          // If the *mover* was the opponent, that means the queen survived their whole turn -> win now.
+          if (moverSide !== queenSide) {
+            State.winner = queenSide;
+            updateTurnUI();
+            return;
+          }
+          // If moverSide == queenSide, they either just claimed or kept it on their own move—no win yet.
+        } else {
+          // New (or switched) claim
+          State.centerClaimOwner = queenSide;
+        }
+      } else {
+        // No queen on center -> clear any claim
+        State.centerClaimOwner = null;
+      }
+
+      // (optional) fallback elimination rule; remove if not desired
       const hasW = [...State.pieces.values()].some(p => p.side === 'W');
       const hasB = [...State.pieces.values()].some(p => p.side === 'B');
       if (!hasW) {State.winner = 'B'; updateTurnUI(); return;}
       if (!hasB) {State.winner = 'W'; updateTurnUI(); return;}
 
+      // Normal turn switch
       switchTurn();
     }
 
