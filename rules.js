@@ -8,8 +8,7 @@ export function legalMovesFrom(q, r) {
   const moves = [];
 
   if (piece.type === "Q") {
-    // Queen: budget = 1, may jump over any number of friendlies at zero cost,
-    // and land on the first empty/enemy beyond. (Queen does NOT merge.)
+    // Queen: budget = 1; free-jump over friendlies; land on first empty/enemy.
     for (const d of dirs) {
       for (let step = 1; ; step++) {
         const q2 = q + d.q * step,
@@ -18,15 +17,16 @@ export function legalMovesFrom(q, r) {
 
         const occ = getPiece(q2, r2);
         if (!occ) {
-          moves.push({ to: { q: q2, r: r2 } });
+          moves.push({ to: { q: q2, r: r2 }, kind: "default" });
           break;
         }
-        if (occ.side === piece.side) {
-          // Friendly: free jump; keep scanning
-          continue;
-        }
-        // Enemy: capture allowed (one landing), cannot pass beyond
-        moves.push({ to: { q: q2, r: r2 } });
+        if (occ.side === piece.side) continue;
+
+        // enemy: label green if it's the queen, else default
+        moves.push({
+          to: { q: q2, r: r2 },
+          kind: occ.type === "Q" ? "queen" : "default",
+        });
         break;
       }
     }
@@ -34,13 +34,11 @@ export function legalMovesFrom(q, r) {
   }
 
   if (piece.type === "D") {
-    // Drone: budget = size; friendlies are free to jump over.
-    // NEW: If the destination is a FRIENDLY DRONE and sizes sum ≤ MAX_STACK, we can land and MERGE (cost 1).
     const mySize = Math.max(1, piece.size || 1);
     const maxSteps = mySize;
 
     for (const d of dirs) {
-      let cost = 0; // spend only on empty landings or capture/merge landings
+      let cost = 0; // spend only on landing (empty/capture/merge)
 
       for (let step = 1; ; step++) {
         const q2 = q + d.q * step,
@@ -48,40 +46,38 @@ export function legalMovesFrom(q, r) {
         if (!inBounds(q2, r2)) break;
 
         const occ = getPiece(q2, r2);
-
         if (!occ) {
-          // Empty hex: costs 1
           if (cost + 1 <= maxSteps) {
-            moves.push({ to: { q: q2, r: r2 } });
+            moves.push({ to: { q: q2, r: r2 }, kind: "default" });
             cost += 1;
-            continue; // keep scanning this ray while budget remains
+            continue;
           }
-          break; // out of budget
+          break;
         }
 
         if (occ.side === piece.side) {
-          // Friendly piece:
           if (occ.type === "D") {
-            // MERGE OPTION (cost 1) only if sizes fit
+            // merge allowed if sizes fit; costs 1
             const occSize = Math.max(1, occ.size || 1);
             const sum = mySize + occSize;
             if (sum <= MAX_STACK && cost + 1 <= maxSteps) {
               moves.push({
                 to: { q: q2, r: r2 },
-                merge: true, // optional flag (not strictly required)
-                mergeSum: sum, // optional: informative for debugging
+                kind: "drone-stack", // <- yellow like placement "drone-stack"
+                merge: true, // optional flag for debugging
               });
             }
-            // Regardless, friendlies are free to jump over; keep scanning without spending budget
-            continue;
           }
-          // Friendly queen or other friendly: cannot land, but can jump over for free
+          // friendlies are free to jump over; keep scanning
           continue;
         }
 
-        // Enemy piece: capture allowed if we have 1 cost left; cannot pass beyond
+        // enemy: capture if budget allows; green if capturing queen, else default
         if (cost + 1 <= maxSteps) {
-          moves.push({ to: { q: q2, r: r2 } });
+          moves.push({
+            to: { q: q2, r: r2 },
+            kind: occ.type === "Q" ? "queen" : "default",
+          });
         }
         break;
       }

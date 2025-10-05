@@ -125,11 +125,20 @@ export function drawFrame(State, centerX, centerY, RADIUS) {
     pop();
   }
 
+  // helper
+  function colorForKind(kind) {
+    return kind === "queen"
+      ? "#a3be8c"
+      : kind === "drone-stack"
+        ? "#ebcb8b"
+        : "#88c0d0";
+  }
+
   for (const mv of State.legalMoves) {
     const { x, y } = axialToPixel(mv.to.q, mv.to.r);
     push();
     translate(centerX + x, centerY + y);
-    stroke("#88c0d0");
+    stroke(colorForKind(mv.kind || "default"));
     strokeWeight(3);
     noFill();
     polygon(HEX_SIZE * 0.82);
