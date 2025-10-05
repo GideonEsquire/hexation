@@ -1,0 +1,78 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #0f1115;
+  color: #e5e9f0;
+  font-family: system-ui, sans-serif;
+}
+
+#ui {
+  position: fixed;
+  inset: 12px auto auto 12px;
+  background: #181a20;
+  padding: 10px 12px;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #2a2f3a;
+  color: #e5e9f0;
+  font-weight: 600;
+}
+
+a {
+  color: #88c0d0;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+canvas {
+  display: block;
+  margin: 0 auto;
+}
+
+.pc-btn {
+  border: none;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, .25);
+}
+
+.pc-white {
+  background: #eceff4;
+  color: #2e3440;
+}
+
+.pc-black {
+  background: #3b4252;
+  color: #eceff4;
+}
+
+.pc-btn.active {
+  outline: 3px solid #a3be8c;
+}
+
+.pc-btn.disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.pc-label {
+  font-size: 13px;
+  opacity: .8;
+}
+
+.pc-rem {
+  font-weight: 600;
+  opacity: .85;
+}
