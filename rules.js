@@ -1,5 +1,5 @@
 // rules.js
-import { dirs, inBounds, isCenter, isPerimeter } from "./geometry.js";
+import { dirs, inBounds, isCenter, isPerimeter, RADIUS } from "./geometry.js";
 import { State, getPiece, setPiece, MAX_STACK } from "./state.js";
 
 export function legalMovesFrom(q, r) {
@@ -8,28 +8,73 @@ export function legalMovesFrom(q, r) {
   const moves = [];
 
   if (piece.type === "Q") {
+    // Queen: budget = 1, but may jump over any number of friendlies at zero cost.
     for (const d of dirs) {
-      const q2 = q + d.q,
-        r2 = r + d.r;
-      if (!inBounds(q2, r2)) continue;
-      const occ = getPiece(q2, r2);
-      if (!occ || occ.side !== piece.side) moves.push({ to: { q: q2, r: r2 } });
-    }
-  } else if (piece.type === "D") {
-    const maxSteps = Math.max(1, piece.size || 1);
-    for (const d of dirs) {
-      for (let step = 1; step <= maxSteps; step++) {
+      for (let step = 1; ; step++) {
         const q2 = q + d.q * step,
           r2 = r + d.r * step;
         if (!inBounds(q2, r2)) break;
+
         const occ = getPiece(q2, r2);
-        if (!occ) moves.push({ to: { q: q2, r: r2 } });
-        else {
-          if (occ.side !== piece.side) moves.push({ to: { q: q2, r: r2 } });
-          break;
+        if (!occ) {
+          // First non-friendly encountered is EMPTY -> can land here (cost 1 of 1)
+          moves.push({ to: { q: q2, r: r2 } });
+          break; // queen has only 1 landing budget
         }
+        if (occ.side === piece.side) {
+          // Friendly: free jump; keep scanning
+          continue;
+        }
+        // Enemy: can capture (cost 1 of 1), but cannot go beyond
+        moves.push({ to: { q: q2, r: r2 } });
+        break;
       }
     }
+    return moves;
+  }
+
+  if (piece.type === "D") {
+    // Drone: can move up to `size` spaces through EMPTY/enemy cells.
+    // NEW: May pass over FRIENDLY pieces at zero cost (cannot land on them).
+    const maxSteps = Math.max(1, piece.size || 1);
+
+    for (const d of dirs) {
+      let cost = 0; // counts only empty steps and the final capture step
+
+      for (let step = 1 /* unbounded until blocked */; ; step++) {
+        const q2 = q + d.q * step;
+        const r2 = r + d.r * step;
+        if (!inBounds(q2, r2)) break;
+
+        const occ = getPiece(q2, r2);
+
+        if (!occ) {
+          // Empty hex: costs 1 of the budget
+          if (cost + 1 <= maxSteps) {
+            moves.push({ to: { q: q2, r: r2 } });
+            cost += 1;
+            // keep scanning further along this ray
+            continue;
+          } else {
+            // out of budget
+            break;
+          }
+        }
+
+        if (occ.side === piece.side) {
+          // Friendly piece: free jump (cannot land), do NOT increase cost
+          // keep scanning further along this ray
+          continue;
+        }
+
+        // Enemy piece: capture allowed if we have 1 cost left; cannot pass beyond
+        if (cost + 1 <= maxSteps) {
+          moves.push({ to: { q: q2, r: r2 } });
+        }
+        break; // stop after first enemy either way
+      }
+    }
+    return moves;
   }
 
   return moves;
@@ -41,8 +86,8 @@ export function legalPlacementHexes() {
   const P = State.placements[side];
 
   if (!P.queenPlaced) {
-    for (let r = -5; r <= 5; r++)
-      for (let q = -5; q <= 5; q++) {
+    for (let r = -RADIUS; r <= RADIUS; r++)
+      for (let q = -RADIUS; q <= RADIUS; q++) {
         if (!inBounds(q, r) || !isPerimeter(q, r)) continue;
         if (!getPiece(q, r)) spots.push({ q, r, kind: "queen" });
       }
@@ -51,8 +96,8 @@ export function legalPlacementHexes() {
 
   if (!State.placeMode) return spots;
 
-  for (let r = -5; r <= 5; r++)
-    for (let q = -5; q <= 5; q++) {
+  for (let r = -RADIUS; r <= RADIUS; r++)
+    for (let q = -RADIUS; q <= RADIUS; q++) {
       if (!inBounds(q, r) || !isPerimeter(q, r)) continue;
       const occ = getPiece(q, r);
       if (!occ) spots.push({ q, r, kind: "drone-empty" });
