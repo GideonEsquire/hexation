@@ -1,4 +1,3 @@
-// main.js
 import {
   RADIUS,
   HEX_SIZE,
@@ -42,8 +41,11 @@ function redrawAll() {
   redraw();
 }
 
+export let droneFont;
+
 // p5 global hooks must be attached to window when using ES modules
-window.setup = function setup() {
+window.setup = async function setup() {
+  droneFont = await loadFont("fonts/AF.ttf");
   canvasW = Math.max(720, Math.min(window.innerWidth, 1200));
   canvasH = Math.max(640, Math.min(window.innerHeight, 1000));
   createCanvas(canvasW, canvasH);

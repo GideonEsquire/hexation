@@ -1,4 +1,3 @@
-// rules.js
 import { dirs, inBounds, isCenter, isPerimeter, RADIUS } from "./geometry.js";
 import { State, getPiece, setPiece, MAX_STACK } from "./state.js";
 

@@ -1,4 +1,3 @@
-// state.js
 export const DRONES_PER_SIDE = 6;
 export const MAX_STACK = 5;
 
@@ -38,9 +37,11 @@ export function remainingDrones(side) {
 export function coordKey(q, r) {
   return `${q},${r}`;
 }
+
 export function getPiece(q, r) {
   return State.pieces.get(coordKey(q, r)) || null;
 }
+
 export function setPiece(q, r, p) {
   if (p) State.pieces.set(coordKey(q, r), p);
   else State.pieces.delete(coordKey(q, r));

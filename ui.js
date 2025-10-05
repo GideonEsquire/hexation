@@ -1,4 +1,3 @@
-// ui.js
 import { remainingDrones } from "./state.js";
 
 export const elTurn = document.getElementById("turn");

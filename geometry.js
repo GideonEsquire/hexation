@@ -1,4 +1,3 @@
-// geometry.js
 export const RADIUS = 5;
 export const HEX_SIZE = 36;
 export const OUTLINE = 1.5;
@@ -15,6 +14,7 @@ export const dirs = [
 export function isCenter(q, r) {
   return q === 0 && r === 0;
 }
+
 export function isPerimeter(q, r) {
   return (
     Math.abs(q) === RADIUS ||
@@ -38,9 +38,11 @@ export function pixelToAxial(x, y) {
 export function axialToCube(q, r) {
   return { x: q, y: -q - r, z: r };
 }
+
 export function cubeToAxial(x, y, z) {
   return { q: x, r: z };
 }
+
 export function cubeRound(c) {
   let rx = Math.round(c.x),
     ry = Math.round(c.y),

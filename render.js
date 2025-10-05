@@ -1,4 +1,4 @@
-// render.js
+import { droneFont } from "./main.js";
 import {
   HEX_SIZE,
   OUTLINE,
@@ -69,9 +69,9 @@ export function drawPiece(x, y, p) {
     }
     endShape(CLOSE);
   } else if (p.type === "D") {
+    textFont(droneFont || "monospace"); // fallback if not loaded yet
     noStroke();
     fill(p.side === "W" ? "#2e3440" : "#d8dee9");
-    circle(0, 0, HEX_SIZE * 0.28);
 
     const sz = String(p.size || 1);
     textAlign(CENTER, CENTER);
@@ -79,7 +79,7 @@ export function drawPiece(x, y, p) {
     fill(p.side === "W" ? "#2e3440" : "#d8dee9");
     stroke(p.side === "W" ? "#eceff4" : "#3b4252");
     strokeWeight(2);
-    text(sz, 0, 0.5);
+    text(sz, 0, 2.5);
   }
   pop();
 }
