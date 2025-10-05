@@ -95,6 +95,14 @@ window.mousePressed = function mousePressed() {
   const P = State.placements[State.turn];
   const occ = getPiece(a.q, a.r);
 
+  // toggle selection if clicking the already-selected piece ---
+  if (State.selected && State.selected.q === a.q && State.selected.r === a.r) {
+    State.selected = null;
+    State.legalMoves = [];
+    // don't change placeMode or turn; just clear highlights
+    redrawAll();
+    return;
+  }
   if (!P.queenPlaced) {
     if (!isPerimeter(a.q, a.r) || occ) return;
     setPiece(a.q, a.r, { side: State.turn, type: "Q", size: 1 });
