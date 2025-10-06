@@ -24,6 +24,8 @@ function isPlaceIntent() {
 }
 
 let canvasW, canvasH, centerX, centerY;
+let gfx = null; // <— reference to the p5 canvas
+let resizeTimer = null; // <— debounce handle
 
 function switchTurn() {
   State.turn = State.turn === "W" ? "B" : "W";
@@ -46,26 +48,19 @@ export let droneFont;
 
 // Compute HEX_SIZE so the whole board fits with padding on any screen
 function computeHexSize() {
-  // Board “diameter” in hexes (pointy top): approx 2*RADIUS + 1 rows; width ~ (2*R+1)*sqrt(3)/2
-  // We'll pick a size that fits both width and height with margin.
   const w = window.innerWidth;
   const h = window.innerHeight;
-  const margin = Math.min(w, h) * 0.08; // 8% padding
+  const margin = Math.min(w, h) * 0.08;
   const availW = w - margin * 2;
   const availH = h - margin * 2;
 
-  // Pixel extent of board for HEX_SIZE = 1:
-  // width1 ≈ sqrt(3) * (2R + 1) - sqrt(3)/2 * R   (safe upper bound)
-  // height1 ≈ 1.5 * (2R + 1)
+  // board bounds for HEX_SIZE = 1
   const width1 = Math.sqrt(3) * (2 * RADIUS + 1);
   const height1 = 1.5 * (2 * RADIUS + 1);
 
-  // pick the limiting dimension
   const sizeByW = availW / width1;
   const sizeByH = availH / height1;
   const hex = Math.floor(Math.min(sizeByW, sizeByH));
-
-  // keep it reasonable
   const clamped = Math.max(22, Math.min(hex, 52));
   setHexSize(clamped);
 }
@@ -73,34 +68,52 @@ function computeHexSize() {
 function configureCanvas() {
   canvasW = window.innerWidth;
   canvasH = window.innerHeight;
-  resizeCanvas(canvasW, canvasH);
+  // guard: p5 v2 sometimes races if gfx not ready yet
+  if (!gfx || typeof resizeCanvas !== "function") return;
+  resizeCanvas(canvasW, canvasH, true);
   centerX = width / 2;
   centerY = height / 2;
+}
+
+function safeRedraw() {
+  // p5 v2 redraw is async—queue it safely if available
+  if (typeof redraw === "function") {
+    requestAnimationFrame(() => redraw());
+  }
 }
 
 // p5 hooks
 window.setup = async function setup() {
   droneFont = await loadFont("fonts/AF.ttf");
-  // Clamp pixel density for performance on high-DPR phones
+  // clamp pixel density for phones
   const dpr = window.devicePixelRatio || 1;
-  pixelDensity(Math.min(2, dpr)); // crisp but not memory hungry
+  pixelDensity(Math.min(2, dpr));
 
   computeHexSize();
-  createCanvas(window.innerWidth, window.innerHeight);
+  gfx = createCanvas(window.innerWidth, window.innerHeight); // store handle
   configureCanvas();
 
   resetState();
   noLoop();
   updateTurnUI(State);
-  redraw();
+  safeRedraw();
 };
 
+// Debounced, crash-proof resize handler
 window.windowResized = function windowResized() {
-  computeHexSize();
-  configureCanvas();
-  updateTurnUI(State);
-  // redrawing next frame is safest in p5 v2
-  requestAnimationFrame(redraw);
+  // Debounce rapid resize events (virtual keyboards, orientation changes)
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    try {
+      computeHexSize();
+      configureCanvas();
+      updateTurnUI(State);
+      safeRedraw();
+    } catch (e) {
+      // keep the app alive; log for debugging
+      console.warn("Resize error:", e);
+    }
+  }, 60); // ~1–2 frames worth; tweak if you like
 };
 
 // Map touch to mouse, so mobile taps work everywhere
@@ -109,6 +122,7 @@ window.touchStarted = function touchStarted() {
   if (mousePressed) mousePressed();
   return false; // prevent default
 };
+
 window.touchEnded = function touchEnded() {
   // Nothing special, but you can forward to mouseReleased if you add it
   return false;
