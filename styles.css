@@ -76,3 +76,39 @@ canvas {
   font-weight: 600;
   opacity: .85;
 }
+
+/* Respect iOS/Android safe areas */
+body {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* Make the UI dock to top-left on desktop, bottom on phones */
+@media (max-width: 640px) {
+  #ui {
+    inset: auto env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    top: auto;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px;
+  }
+
+  .pc-btn {
+    padding: 8px 14px;
+    font-size: 16px;
+  }
+
+  .pc-label { display: none; }          /* save space */
+  .pc-rem { font-weight: 700; }
+
+  /* Reduce box-shadow to save GPU on low-end phones */
+  #ui { box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+}
+
+/* Let the canvas capture gestures without double-tap zoom */
+canvas {
+  touch-action: manipulation; /* keeps pinch scroll on the page, removes dbl-tap zoom */
+}

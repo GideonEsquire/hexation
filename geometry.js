@@ -1,7 +1,9 @@
 export const RADIUS = 5;
-export const HEX_SIZE = 36;
+export let HEX_SIZE = 36; // was const
 export const OUTLINE = 1.5;
-
+export function setHexSize(v) {
+  HEX_SIZE = v;
+}
 export const dirs = [
   { q: +1, r: 0 },
   { q: +1, r: -1 },

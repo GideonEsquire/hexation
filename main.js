@@ -5,6 +5,7 @@ import {
   axialToPixel,
   inBounds,
   isPerimeter,
+  setHexSize,
 } from "./geometry.js";
 import {
   State,
@@ -43,29 +44,99 @@ function redrawAll() {
 
 export let droneFont;
 
-// p5 global hooks must be attached to window when using ES modules
-window.setup = async function setup() {
-  droneFont = await loadFont("fonts/AF.ttf");
-  canvasW = Math.max(720, Math.min(window.innerWidth, 1200));
-  canvasH = Math.max(640, Math.min(window.innerHeight, 1000));
-  createCanvas(canvasW, canvasH);
+// Compute HEX_SIZE so the whole board fits with padding on any screen
+function computeHexSize() {
+  // Board “diameter” in hexes (pointy top): approx 2*RADIUS + 1 rows; width ~ (2*R+1)*sqrt(3)/2
+  // We'll pick a size that fits both width and height with margin.
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const margin = Math.min(w, h) * 0.08; // 8% padding
+  const availW = w - margin * 2;
+  const availH = h - margin * 2;
 
-  centerX = width / 2;
-  centerY = height / 2;
+  // Pixel extent of board for HEX_SIZE = 1:
+  // width1 ≈ sqrt(3) * (2R + 1) - sqrt(3)/2 * R   (safe upper bound)
+  // height1 ≈ 1.5 * (2R + 1)
+  const width1 = Math.sqrt(3) * (2 * RADIUS + 1);
+  const height1 = 1.5 * (2 * RADIUS + 1);
 
-  resetState();
-  noLoop();
-  redrawAll();
-};
+  // pick the limiting dimension
+  const sizeByW = availW / width1;
+  const sizeByH = availH / height1;
+  const hex = Math.floor(Math.min(sizeByW, sizeByH));
 
-window.windowResized = function windowResized() {
-  canvasW = Math.max(720, Math.min(window.innerWidth, 1200));
-  canvasH = Math.max(640, Math.min(window.innerHeight, 1000));
+  // keep it reasonable
+  const clamped = Math.max(22, Math.min(hex, 52));
+  setHexSize(clamped);
+}
+
+function configureCanvas() {
+  canvasW = window.innerWidth;
+  canvasH = window.innerHeight;
   resizeCanvas(canvasW, canvasH);
   centerX = width / 2;
   centerY = height / 2;
-  redrawAll();
+}
+
+// p5 hooks
+window.setup = async function setup() {
+  droneFont = await loadFont("fonts/AF.ttf");
+  // Clamp pixel density for performance on high-DPR phones
+  const dpr = window.devicePixelRatio || 1;
+  pixelDensity(Math.min(2, dpr)); // crisp but not memory hungry
+
+  computeHexSize();
+  createCanvas(window.innerWidth, window.innerHeight);
+  configureCanvas();
+
+  resetState();
+  noLoop();
+  updateTurnUI(State);
+  redraw();
 };
+
+window.windowResized = function windowResized() {
+  computeHexSize();
+  configureCanvas();
+  updateTurnUI(State);
+  // redrawing next frame is safest in p5 v2
+  requestAnimationFrame(redraw);
+};
+
+// Map touch to mouse, so mobile taps work everywhere
+window.touchStarted = function touchStarted() {
+  // Prevent accidental page scroll if touch starts on canvas
+  if (mousePressed) mousePressed();
+  return false; // prevent default
+};
+window.touchEnded = function touchEnded() {
+  // Nothing special, but you can forward to mouseReleased if you add it
+  return false;
+};
+
+// // p5 global hooks must be attached to window when using ES modules
+// window.setup = async function setup() {
+//   droneFont = await loadFont("fonts/AF.ttf");
+//   canvasW = Math.max(720, Math.min(window.innerWidth, 1200));
+//   canvasH = Math.max(640, Math.min(window.innerHeight, 1000));
+//   createCanvas(canvasW, canvasH);
+//
+//   centerX = width / 2;
+//   centerY = height / 2;
+//
+//   resetState();
+//   noLoop();
+//   redrawAll();
+// };
+//
+// window.windowResized = function windowResized() {
+//   canvasW = Math.max(720, Math.min(window.innerWidth, 1200));
+//   canvasH = Math.max(640, Math.min(window.innerHeight, 1000));
+//   resizeCanvas(canvasW, canvasH);
+//   centerX = width / 2;
+//   centerY = height / 2;
+//   redrawAll();
+// };
 
 window.draw = function draw() {
   drawFrame(State, centerX, centerY, RADIUS);
