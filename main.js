@@ -128,30 +128,6 @@ window.touchEnded = function touchEnded() {
   return false;
 };
 
-// // p5 global hooks must be attached to window when using ES modules
-// window.setup = async function setup() {
-//   droneFont = await loadFont("fonts/AF.ttf");
-//   canvasW = Math.max(720, Math.min(window.innerWidth, 1200));
-//   canvasH = Math.max(640, Math.min(window.innerHeight, 1000));
-//   createCanvas(canvasW, canvasH);
-//
-//   centerX = width / 2;
-//   centerY = height / 2;
-//
-//   resetState();
-//   noLoop();
-//   redrawAll();
-// };
-//
-// window.windowResized = function windowResized() {
-//   canvasW = Math.max(720, Math.min(window.innerWidth, 1200));
-//   canvasH = Math.max(640, Math.min(window.innerHeight, 1000));
-//   resizeCanvas(canvasW, canvasH);
-//   centerX = width / 2;
-//   centerY = height / 2;
-//   redrawAll();
-// };
-
 window.draw = function draw() {
   drawFrame(State, centerX, centerY, RADIUS);
 

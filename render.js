@@ -51,6 +51,18 @@ export function drawPiece(x, y, p) {
   push();
   translate(x, y);
   noStroke();
+
+  // // --- underglow ---
+  // push();
+  // const glowColor =
+  //   p.side === "W" ? color(255, 255, 255, 30) : color(136, 192, 208, 35); // nord frost blue
+  // fill(glowColor);
+  // // draw a few increasingly small circles for soft falloff
+  // for (let i = 0; i < 4; i++) {
+  //   circle(0, 0, HEX_SIZE * (1.3 - i * 0.1));
+  // }
+  // pop();
+
   fill(p.side === "W" ? "#eceff4" : "#3b4252");
   circle(0, 0, HEX_SIZE * 1.05);
 
@@ -75,7 +87,7 @@ export function drawPiece(x, y, p) {
 
     const sz = String(p.size || 1);
     textAlign(CENTER, CENTER);
-    textSize(HEX_SIZE * 0.36);
+    textSize(HEX_SIZE * 0.45);
     fill(p.side === "W" ? "#2e3440" : "#d8dee9");
     stroke(p.side === "W" ? "#eceff4" : "#3b4252");
     strokeWeight(2);

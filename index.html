@@ -19,15 +19,42 @@
         Reset Game
       </button>
     </div>
-    <div style="margin-top:6px;font-size:13px;opacity:.85">
-      <p>Click a piece ➜ click a highlighted hex. Hold the center with your Queen or capture opponent's Queen.</p>
-    </div>
+    <button id="helpBtn" style="margin-top:8px;background:#2e3440;color:#eceff4;
+         border:none;padding:6px 12px;border-radius:6px;
+         cursor:pointer;font-weight:600;">
+      ❔ Help
+    </button>
+
     <div id="placeControls" style="margin-top:8px; display:flex; gap:8px; align-items:center;">
       <div class="pc-label">Place Drone:</div>
       <button id="placeW" class="pc-btn pc-white" title="White place/stack toggle">W <span id="remW"
           class="pc-rem">(0)</span></button>
       <button id="placeB" class="pc-btn pc-black" title="Black place/stack toggle">B <span id="remB"
           class="pc-rem">(0)</span></button>
+    </div>
+  </div>
+
+  <div id="helpBackdrop" class="help-backdrop" aria-hidden="true"></div>
+
+  <div id="helpDialog" class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="helpTitle"
+    aria-describedby="helpContent" tabindex="-1">
+    <div class="help-card">
+      <button id="helpClose" class="help-close" aria-label="Close help">✕</button>
+      <div class="help-header">
+        <div class="help-icon">⬢</div>
+        <h2 id="helpTitle">Hexation — How to Play</h2>
+      </div>
+      <div id="helpContent" class="help-body">
+        <p><strong>Goal:</strong> Capture the enemy Queen or hold the center for a full turn.</p>
+        <ul>
+          <li><b>Turns:</b> Alternate; place or move one piece. Must place <b>Queen</b> on turn 1.</li>
+          <li><b>Queen:</b> moves <b>1 hex</b>, can jump friendlies, captures by landing.</li>
+          <li><b>Drones:</b> move up to their stack height, jump friendlies, merge ≤ 5.</li>
+          <li><b>Center:</b> landing a Drone upgrades it to max (5).</li>
+          <li><b>Win:</b> capture the Queen or survive a full enemy turn with your Queen at center.</li>
+        </ul>
+        <div class="help-tip">Tip: Use the W/B buttons to toggle Drone placement.</div>
+      </div>
     </div>
   </div>
 

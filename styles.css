@@ -112,3 +112,104 @@ body {
 canvas {
   touch-action: manipulation; /* keeps pinch scroll on the page, removes dbl-tap zoom */
 }
+
+/* --- Help modal & backdrop --- */
+.help-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(15,17,21,0.55);
+  backdrop-filter: blur(6px);
+  opacity: 0; pointer-events: none;
+  transition: opacity .22s ease;
+  z-index: 900;
+}
+
+.help-dialog {
+  position: fixed; inset: 0;
+  display: grid; place-items: center;
+  pointer-events: none; z-index: 901;
+  opacity: 0; transform: translateY(8px) scale(.98);
+  transition: opacity .22s ease, transform .22s ease;
+}
+
+.help-dialog.open,
+.help-backdrop.open {
+  opacity: 1; pointer-events: auto;
+}
+
+.help-dialog.open {
+  transform: translateY(0) scale(1);
+}
+
+/* Card */
+.help-card {
+  width: min(720px, calc(100% - 28px));
+  background: rgba(36, 43, 57, 0.72);
+  border: 1px solid rgba(136, 192, 208, 0.18);
+  border-radius: 14px;
+  box-shadow: 0 18px 60px rgba(0,0,0,.45);
+  color: #e5e9f0;
+  padding: 18px 18px 16px;
+  transform-origin: 50% 44%;
+  animation: pop .24s ease both;
+}
+
+@keyframes pop {
+  0% { transform: scale(.96); opacity: .0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.help-header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 8px;
+}
+.help-icon {
+  width: 34px; height: 34px; border-radius: 9px;
+  display: grid; place-items: center;
+  background: rgba(143,188,187,.18);
+  color: #a3be8c; font-weight: 800;
+}
+.help-header h2 {
+  margin: 0; font-size: 20px; letter-spacing: .2px;
+}
+
+.help-body { font-size: 15px; line-height: 1.5; }
+.help-body ul { margin: 8px 0 0 18px; padding: 0; }
+.help-body li { margin: 6px 0; }
+.help-tip {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(163,190,140,.14);
+  border: 1px dashed rgba(163,190,140,.35);
+  font-weight: 600;
+}
+
+/* Close button */
+.help-close {
+  position: absolute; top: 10px; right: 10px;
+  background: #2e3440; color: #eceff4;
+  border: 1px solid rgba(216,222,233,.25);
+  border-radius: 10px; padding: 4px 10px;
+  cursor: pointer; font-weight: 700;
+}
+.help-close:hover { filter: brightness(1.08); }
+
+/* Button subtle pulse to draw attention on first load (optional) */
+@keyframes softPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(136,192,208,.0); }
+  50%     { box-shadow: 0 0 0 8px rgba(136,192,208,.12); }
+}
+#helpBtn.attn { animation: softPulse 2s ease-in-out 3; }
+
+/* Mobile tweaks */
+@media (max-width: 640px) {
+  .help-card { padding: 16px 14px; }
+  .help-header h2 { font-size: 18px; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .help-backdrop, .help-dialog { transition: none; }
+  .help-card { animation: none; }
+  #helpBtn.attn { animation: none; }
+}
