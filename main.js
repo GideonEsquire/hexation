@@ -18,6 +18,7 @@ import { legalMovesFrom, applyMove } from "./rules.js";
 import { drawFrame } from "./render.js";
 import { updateTurnUI, elResetBtn, placeBtnW, placeBtnB } from "./ui.js";
 import { SFX, resumeAudio } from "./sounds.js";
+import { Celebration } from "./state.js";
 
 // Helper: is placing mode from UI toggle
 function isPlaceIntent() {
@@ -153,6 +154,10 @@ window.draw = function draw() {
     endShape(CLOSE);
     pop();
   }
+  if (State.winner && !Celebration.active) {
+    // freeze on the final celebratory frame
+    noLoop();
+  }
 };
 
 window.mousePressed = function mousePressed() {
@@ -213,6 +218,10 @@ window.mousePressed = function mousePressed() {
       applyMove(State.selected, mv);
       State.selected = null;
       State.legalMoves = [];
+      // if a win just triggered a celebration, start continuous frames
+      if (Celebration.active) {
+        loop();
+      }
       if (!State.winner) switchTurn();
       redrawAll();
       return;

@@ -46,3 +46,29 @@ export function setPiece(q, r, p) {
   if (p) State.pieces.set(coordKey(q, r), p);
   else State.pieces.delete(coordKey(q, r));
 }
+
+// Add/replace your celebration block with:
+export const Celebration = {
+  active: false,
+  t0: 0,
+  duration: 1800, // ms
+  origin: { q: 0, r: 0 }, // where rings emit from
+};
+
+export function startCelebration(q = 0, r = 0) {
+  Celebration.active = true;
+  Celebration.t0 =
+    typeof performance !== "undefined" ? performance.now() : Date.now();
+  Celebration.origin = { q, r };
+}
+
+// Helper to locate a side's queen on the board
+export function findQueen(side) {
+  for (const [key, p] of State.pieces.entries()) {
+    if (p.type === "Q" && p.side === side) {
+      const [qStr, rStr] = key.split(",");
+      return { q: parseInt(qStr, 10), r: parseInt(rStr, 10) };
+    }
+  }
+  return null;
+}

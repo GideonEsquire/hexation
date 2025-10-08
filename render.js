@@ -8,8 +8,22 @@ import {
 } from "./geometry.js";
 import { getPiece } from "./state.js";
 import { legalPlacementHexes } from "./rules.js";
+import { Celebration } from "./state.js";
 
 const TRI_COLORS = ["#1b1f27", "#202633", "#242b39"];
+
+function easeOutQuad(t) {
+  return 1 - (1 - t) * (1 - t);
+}
+
+function hexRing(radiusPx) {
+  beginShape();
+  for (let i = 0; i < 6; i++) {
+    const ang = (Math.PI / 180) * (60 * i - 30);
+    vertex(radiusPx * Math.cos(ang), radiusPx * Math.sin(ang));
+  }
+  endShape(CLOSE);
+}
 
 export function boardCells(RADIUS, centerX, centerY) {
   const cells = [];
@@ -160,5 +174,46 @@ export function drawFrame(State, centerX, centerY, RADIUS) {
   for (const c of cells) {
     const p = getPiece(c.q, c.r);
     if (p) drawPiece(c.x, c.y, p);
+  }
+
+  // --- Celebration overlay (runs only while active) ---
+  if (Celebration.active && State.winner) {
+    const now =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    let t = (now - Celebration.t0) / Celebration.duration; // 0..1
+    if (t >= 1) {
+      Celebration.active = false; // auto-stop after duration
+    } else {
+      const eased = easeOutQuad(t);
+      const winnerColor =
+        State.winner === "W" ? [236, 239, 244] : [136, 192, 208]; // Nord light / frost
+      const origin = Celebration.origin || { q: 0, r: 0 };
+      const { x, y } = axialToPixel(origin.q, origin.r);
+
+      push();
+      translate(centerX + x, centerY + y);
+      noFill();
+
+      // 3 expanding hex-rings from center, staggered
+      for (let i = 0; i < 3; i++) {
+        const delay = i * 0.12;
+        const tt = Math.min(Math.max((t - delay) / 0.7, 0), 1); // 0..1 per ring
+        if (tt <= 0) continue;
+        const alpha = Math.floor(160 * (1 - tt)); // fade out
+        const radius = HEX_SIZE * (0.9 + tt * (0.9 + RADIUS * 0.65));
+        stroke(winnerColor[0], winnerColor[1], winnerColor[2], alpha);
+        strokeWeight(3);
+        hexRing(radius);
+      }
+      pop();
+
+      // subtle vignette flash over whole screen
+      push();
+      const a = Math.floor(80 * (1 - eased));
+      noStroke();
+      fill(15, 17, 21, a); // board color w/ low alpha
+      rect(0, 0, width, height);
+      pop();
+    }
   }
 }

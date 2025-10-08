@@ -1,6 +1,13 @@
 import { dirs, inBounds, isCenter, isPerimeter, RADIUS } from "./geometry.js";
-import { State, getPiece, setPiece, MAX_STACK } from "./state.js";
 import { SFX } from "./sounds.js";
+import {
+  State,
+  getPiece,
+  setPiece,
+  MAX_STACK,
+  startCelebration,
+  findQueen,
+} from "./state.js";
 
 export function legalMovesFrom(q, r) {
   const piece = getPiece(q, r);
@@ -159,6 +166,9 @@ export function applyMove(from, move) {
     // Queen capture is sudden death
     if (dst && dst.type === "Q" && dst.side !== moverSide) {
       State.winner = moverSide;
+      const qpos = findQueen(moverSide);
+      if (qpos) startCelebration(qpos.q, qpos.r);
+      else startCelebration(0, 0); // fallback
       return;
     }
 
@@ -178,6 +188,11 @@ export function applyMove(from, move) {
       // If the mover was the opponent and the claim still stands after their turn -> win now.
       if (moverSide !== queenSide) {
         State.winner = queenSide;
+        // The winning queen is on center by rule, but we still look it up for consistency
+        const qpos = findQueen(queenSide) || { q: 0, r: 0 };
+        startCelebration(qpos.q, qpos.r);
+        if (qpos) startCelebration(qpos.q, qpos.r);
+        else startCelebration(0, 0); // fallback
         return;
       }
     } else {
@@ -193,10 +208,16 @@ export function applyMove(from, move) {
   const hasB = [...State.pieces.values()].some((p) => p.side === "B");
   if (!hasW) {
     State.winner = "B";
+    const qpos = findQueen(moverSide);
+    if (qpos) startCelebration(qpos.q, qpos.r);
+    else startCelebration(0, 0); // fallback
     return;
   }
   if (!hasB) {
     State.winner = "W";
+    const qpos = findQueen(moverSide);
+    if (qpos) startCelebration(qpos.q, qpos.r);
+    else startCelebration(0, 0); // fallback
     return;
   }
 }
