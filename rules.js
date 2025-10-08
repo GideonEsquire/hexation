@@ -1,5 +1,6 @@
 import { dirs, inBounds, isCenter, isPerimeter, RADIUS } from "./geometry.js";
 import { State, getPiece, setPiece, MAX_STACK } from "./state.js";
+import { SFX } from "./sounds.js";
 
 export function legalMovesFrom(q, r) {
   const piece = getPiece(q, r);
@@ -142,6 +143,8 @@ export function applyMove(from, move) {
       const landed = getPiece(move.to.q, move.to.r);
       if (landed && landed.type === "D" && isCenter(move.to.q, move.to.r)) {
         setPiece(move.to.q, move.to.r, { ...landed, size: MAX_STACK });
+        SFX.move();
+        console.log("sound");
       }
     }
     // No queen claim/capture logic needed here; fall through to post-processing
@@ -149,6 +152,8 @@ export function applyMove(from, move) {
   // --- Capture or move into empty (or enemy) ---
   else {
     setPiece(move.to.q, move.to.r, src);
+    SFX.move();
+    console.log("sound");
     setPiece(from.q, from.r, null);
 
     // Queen capture is sudden death

@@ -17,6 +17,7 @@ import {
 import { legalMovesFrom, applyMove } from "./rules.js";
 import { drawFrame } from "./render.js";
 import { updateTurnUI, elResetBtn, placeBtnW, placeBtnB } from "./ui.js";
+import { SFX, resumeAudio } from "./sounds.js";
 
 // Helper: is placing mode from UI toggle
 function isPlaceIntent() {
@@ -85,6 +86,10 @@ function safeRedraw() {
 // p5 hooks
 window.setup = async function setup() {
   droneFont = await loadFont("fonts/AF.ttf");
+  window.addEventListener("pointerdown", resumeAudio, {
+    once: true,
+    passive: true,
+  });
   // clamp pixel density for phones
   const dpr = window.devicePixelRatio || 1;
   pixelDensity(Math.min(2, dpr));
