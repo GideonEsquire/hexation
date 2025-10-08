@@ -19,6 +19,21 @@ import { drawFrame } from "./render.js";
 import { updateTurnUI, elResetBtn, placeBtnW, placeBtnB } from "./ui.js";
 import { SFX, resumeAudio } from "./sounds.js";
 import { Celebration } from "./state.js";
+import {
+  drawBackgroundTriangles,
+  stepBackgroundAnimation,
+} from "./background.js";
+
+let ambientTimer = null;
+function startAmbientTicker() {
+  if (ambientTimer) return;
+  // ~10 FPS is plenty for a subtle background
+  ambientTimer = setInterval(() => {
+    if (!Celebration.active) {
+      if (typeof redraw === "function") redraw();
+    }
+  }, 100);
+}
 
 // Helper: is placing mode from UI toggle
 function isPlaceIntent() {
@@ -95,6 +110,7 @@ window.setup = async function setup() {
   const dpr = window.devicePixelRatio || 1;
   pixelDensity(Math.min(2, dpr));
 
+  startAmbientTicker();
   computeHexSize();
   gfx = createCanvas(window.innerWidth, window.innerHeight); // store handle
   configureCanvas();
@@ -135,6 +151,8 @@ window.touchEnded = function touchEnded() {
 };
 
 window.draw = function draw() {
+  drawBackgroundTriangles(HEX_SIZE, axialToPixel, centerX, centerY);
+
   drawFrame(State, centerX, centerY, RADIUS);
 
   // hover ring
@@ -158,6 +176,7 @@ window.draw = function draw() {
     // freeze on the final celebratory frame
     noLoop();
   }
+  stepBackgroundAnimation(0.01);
 };
 
 window.mousePressed = function mousePressed() {

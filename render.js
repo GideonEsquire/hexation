@@ -111,7 +111,6 @@ export function drawPiece(x, y, p) {
 }
 
 export function drawFrame(State, centerX, centerY, RADIUS) {
-  background("#0f1115");
   const cells = boardCells(RADIUS, centerX, centerY);
 
   for (const c of cells) {

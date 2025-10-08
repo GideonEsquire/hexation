@@ -158,7 +158,6 @@ export function applyMove(from, move) {
   else {
     setPiece(move.to.q, move.to.r, src);
     SFX.move();
-    console.log("sound");
     setPiece(from.q, from.r, null);
 
     // Queen capture is sudden death
