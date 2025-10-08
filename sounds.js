@@ -16,7 +16,7 @@ function ensureGraph() {
     comp.release.value = 0.25;
 
     master = ctx.createGain();
-    master.gain.value = 0.6; // 🔊 make it audible across devices
+    master.gain.value = 1.0; // 🔊 make it audible across devices
 
     master.connect(comp).connect(ctx.destination);
   }
@@ -114,3 +114,40 @@ export const SFX = {
 if (typeof window !== "undefined") {
   window.__soundTest = testBeep;
 }
+
+// === Celebration Jingle ===
+// Two quick arpeggio notes followed by a soft chord.
+// Distinct patterns for each side for subtle variety.
+function playNote(freq, start, len, type = "sine", gainAmt = 0.15) {
+  const c = ensureGraph();
+  const osc = c.createOscillator();
+  const g = c.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, c.currentTime + start);
+  g.gain.setValueAtTime(0, c.currentTime + start);
+  g.gain.linearRampToValueAtTime(gainAmt, c.currentTime + start + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + start + len);
+  osc.connect(g).connect(master);
+  osc.start(c.currentTime + start);
+  osc.stop(c.currentTime + start + len + 0.02);
+}
+
+function winJingle(side = "W") {
+  const c = ensureGraph();
+  const base = side === "W" ? 440 : 392; // A4 vs G4
+  const scale = [1, 1.25, 1.5, 2]; // small major chord intervals
+  const seq =
+    side === "W"
+      ? [base, base * 1.25, base * 1.5, base * 2] // rising
+      : [base * 2, base * 1.5, base * 1.25, base]; // falling
+
+  // quick arpeggio
+  seq.forEach((f, i) => playNote(f, i * 0.08, 0.25, "triangle", 0.18));
+
+  // soft chord sustain
+  setTimeout(() => {
+    scale.forEach((s) => playNote(base * s, 0, 0.6, "sine", 0.1));
+  }, 400);
+}
+
+SFX.win = winJingle;

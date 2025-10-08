@@ -150,8 +150,6 @@ export function applyMove(from, move) {
       const landed = getPiece(move.to.q, move.to.r);
       if (landed && landed.type === "D" && isCenter(move.to.q, move.to.r)) {
         setPiece(move.to.q, move.to.r, { ...landed, size: MAX_STACK });
-        SFX.move();
-        console.log("sound");
       }
     }
     // No queen claim/capture logic needed here; fall through to post-processing
@@ -169,6 +167,7 @@ export function applyMove(from, move) {
       const qpos = findQueen(moverSide);
       if (qpos) startCelebration(qpos.q, qpos.r);
       else startCelebration(0, 0); // fallback
+      SFX.win(moverSide);
       return;
     }
 
@@ -193,6 +192,7 @@ export function applyMove(from, move) {
         startCelebration(qpos.q, qpos.r);
         if (qpos) startCelebration(qpos.q, qpos.r);
         else startCelebration(0, 0); // fallback
+        SFX.win(moverSide);
         return;
       }
     } else {
@@ -211,6 +211,7 @@ export function applyMove(from, move) {
     const qpos = findQueen(moverSide);
     if (qpos) startCelebration(qpos.q, qpos.r);
     else startCelebration(0, 0); // fallback
+    SFX.win(moverSide);
     return;
   }
   if (!hasB) {
@@ -218,6 +219,7 @@ export function applyMove(from, move) {
     const qpos = findQueen(moverSide);
     if (qpos) startCelebration(qpos.q, qpos.r);
     else startCelebration(0, 0); // fallback
+    SFX.win(moverSide);
     return;
   }
 }

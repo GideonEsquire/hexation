@@ -180,6 +180,7 @@ window.mousePressed = function mousePressed() {
     if (!isPerimeter(a.q, a.r) || occ) return;
     setPiece(a.q, a.r, { side: State.turn, type: "Q", size: 1 });
     P.queenPlaced = true;
+    SFX.move();
     State.selected = null;
     State.legalMoves = [];
     switchTurn();
@@ -196,6 +197,7 @@ window.mousePressed = function mousePressed() {
     if (!occ2) {
       setPiece(a.q, a.r, { side: State.turn, type: "D", size: 1 });
       State.placements[State.turn].dronesPlaced += 1;
+      SFX.move();
       switchTurn();
       redrawAll();
       return;
@@ -205,6 +207,7 @@ window.mousePressed = function mousePressed() {
       if (next > (occ2.size || 1)) {
         setPiece(a.q, a.r, { ...occ2, size: next });
         State.placements[State.turn].dronesPlaced += 1;
+        SFX.move();
         switchTurn();
         redrawAll();
         return;
