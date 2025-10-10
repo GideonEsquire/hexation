@@ -6,9 +6,8 @@ import {
   inBounds,
   triColorIndex,
 } from "./geometry.js";
-import { getPiece } from "./state.js";
+import { currentPlayer, getPiece, Celebration, State } from "./state.js";
 import { legalPlacementHexes } from "./rules.js";
-import { Celebration } from "./state.js";
 
 const TRI_COLORS = ["#1b1f27", "#202633", "#242b39"];
 
@@ -62,26 +61,18 @@ export function polygon(radius) {
 }
 
 export function drawPiece(x, y, p) {
+  const pl = State.players.find((pl) => pl.id === p.side);
+  const fillCol = pl?.fill || "#eceff4";
+  const ringCol = pl?.stroke || "#2e3440";
+
   push();
   translate(x, y);
   noStroke();
 
-  // // --- underglow ---
-  // push();
-  // const glowColor =
-  //   p.side === "W" ? color(255, 255, 255, 30) : color(136, 192, 208, 35); // nord frost blue
-  // fill(glowColor);
-  // // draw a few increasingly small circles for soft falloff
-  // for (let i = 0; i < 4; i++) {
-  //   circle(0, 0, HEX_SIZE * (1.3 - i * 0.1));
-  // }
-  // pop();
-
-  fill(p.side === "W" ? "#eceff4" : "#3b4252");
+  fill(fillCol);
   circle(0, 0, HEX_SIZE * 1.05);
-
   noFill();
-  stroke(p.side === "W" ? "#2e3440" : "#d8dee9");
+  stroke(ringCol);
   strokeWeight(3);
   circle(0, 0, HEX_SIZE * 0.7);
 
@@ -95,17 +86,13 @@ export function drawPiece(x, y, p) {
     }
     endShape(CLOSE);
   } else if (p.type === "D") {
-    textFont(droneFont || "monospace"); // fallback if not loaded yet
-    noStroke();
-    fill(p.side === "W" ? "#2e3440" : "#d8dee9");
-
-    const sz = String(p.size || 1);
+    textFont(droneFont || "monospace");
+    fill(ringCol);
+    stroke(fillCol);
+    strokeWeight(2);
     textAlign(CENTER, CENTER);
     textSize(HEX_SIZE * 0.45);
-    fill(p.side === "W" ? "#2e3440" : "#d8dee9");
-    stroke(p.side === "W" ? "#eceff4" : "#3b4252");
-    strokeWeight(2);
-    text(sz, 0, 2.5);
+    text(String(p.size || 1), 0, 2.5);
   }
   pop();
 }

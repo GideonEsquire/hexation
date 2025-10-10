@@ -213,3 +213,6 @@ canvas {
   .help-card { animation: none; }
   #helpBtn.attn { animation: none; }
 }
+
+/* keep existing .pc-btn; optionally tint when active */
+.pc-btn.active { outline: 3px solid #a3be8c; }

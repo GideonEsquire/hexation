@@ -13,10 +13,14 @@ import {
   getPiece,
   setPiece,
   remainingDrones,
+  currentPlayer,
+  rotateTurn,
+  setPlayerCount,
+  MAX_STACK,
 } from "./state.js";
 import { legalMovesFrom, applyMove } from "./rules.js";
 import { drawFrame } from "./render.js";
-import { updateTurnUI, elResetBtn, placeBtnW, placeBtnB } from "./ui.js";
+import { updateTurnUI, elResetBtn, placeBtn } from "./ui.js";
 import { SFX, resumeAudio } from "./sounds.js";
 import { Celebration } from "./state.js";
 import {
@@ -35,18 +39,17 @@ function startAmbientTicker() {
   }, 100);
 }
 
-// Helper: is placing mode from UI toggle
-function isPlaceIntent() {
-  return !!State.placeMode;
-}
-
 let canvasW, canvasH, centerX, centerY;
 let gfx = null; // <— reference to the p5 canvas
 let resizeTimer = null; // <— debounce handle
 
 function switchTurn() {
-  State.turn = State.turn === "W" ? "B" : "W";
   State.placeMode = false;
+  rotateTurn();
+}
+
+function isPlaceIntent() {
+  return !!State.placeMode;
 }
 
 function mouseToAxial() {
@@ -102,6 +105,7 @@ function safeRedraw() {
 // p5 hooks
 window.setup = async function setup() {
   droneFont = await loadFont("fonts/AF.ttf");
+  setPlayerCount(4);
   window.addEventListener("pointerdown", resumeAudio, {
     once: true,
     passive: true,
@@ -181,23 +185,25 @@ window.draw = function draw() {
 
 window.mousePressed = function mousePressed() {
   if (State.winner) return;
+  const me = currentPlayer().id;
   const a = mouseToAxial();
   if (!a) return;
 
-  const P = State.placements[State.turn];
+  const P = State.placements[me];
   const occ = getPiece(a.q, a.r);
 
-  // toggle selection if clicking the already-selected piece ---
+  // deselect if re-click
   if (State.selected && State.selected.q === a.q && State.selected.r === a.r) {
     State.selected = null;
     State.legalMoves = [];
-    // don't change placeMode or turn; just clear highlights
     redrawAll();
     return;
   }
+
+  // first: mandatory queen placement if not placed
   if (!P.queenPlaced) {
     if (!isPerimeter(a.q, a.r) || occ) return;
-    setPiece(a.q, a.r, { side: State.turn, type: "Q", size: 1 });
+    setPiece(a.q, a.r, { side: me, type: "Q", size: 1 });
     P.queenPlaced = true;
     SFX.move();
     State.selected = null;
@@ -207,25 +213,21 @@ window.mousePressed = function mousePressed() {
     return;
   }
 
-  if (
-    isPlaceIntent() &&
-    remainingDrones(State.turn) > 0 &&
-    isPerimeter(a.q, a.r)
-  ) {
+  // placing drones?
+  if (isPlaceIntent() && remainingDrones(me) > 0 && isPerimeter(a.q, a.r)) {
     const occ2 = getPiece(a.q, a.r);
     if (!occ2) {
-      setPiece(a.q, a.r, { side: State.turn, type: "D", size: 1 });
-      State.placements[State.turn].dronesPlaced += 1;
+      setPiece(a.q, a.r, { side: me, type: "D", size: 1 });
+      State.placements[me].dronesPlaced += 1;
       SFX.move();
       switchTurn();
       redrawAll();
       return;
-    } else if (occ2.side === State.turn && occ2.type === "D") {
-      const MAX_STACK = 5;
+    } else if (occ2.side === me && occ2.type === "D") {
       const next = Math.min(MAX_STACK, (occ2.size || 1) + 1);
       if (next > (occ2.size || 1)) {
         setPiece(a.q, a.r, { ...occ2, size: next });
-        State.placements[State.turn].dronesPlaced += 1;
+        State.placements[me].dronesPlaced += 1;
         SFX.move();
         switchTurn();
         redrawAll();
@@ -234,21 +236,19 @@ window.mousePressed = function mousePressed() {
     }
   }
 
+  // selection / move
   if (State.selected) {
     const mv = State.legalMoves.find((m) => m.to.q === a.q && m.to.r === a.r);
     if (mv) {
       applyMove(State.selected, mv);
       State.selected = null;
       State.legalMoves = [];
-      // if a win just triggered a celebration, start continuous frames
-      if (Celebration.active) {
-        loop();
-      }
+      if (Celebration.active) loop();
       if (!State.winner) switchTurn();
       redrawAll();
       return;
     }
-    if (occ && occ.side === State.turn) {
+    if (occ && occ.side === me) {
       State.selected = { q: a.q, r: a.r };
       State.legalMoves = legalMovesFrom(a.q, a.r);
       redrawAll();
@@ -260,7 +260,7 @@ window.mousePressed = function mousePressed() {
     return;
   }
 
-  if (occ && occ.side === State.turn) {
+  if (occ && occ.side === me) {
     State.selected = { q: a.q, r: a.r };
     State.legalMoves = legalMovesFrom(a.q, a.r);
     redrawAll();
@@ -275,28 +275,11 @@ elResetBtn.addEventListener("click", () => {
   document.getElementById("resetWrap").style.display = "none";
 });
 
-placeBtnW.addEventListener("click", () => {
-  const P = State.placements.W;
-  if (
-    State.turn !== "W" ||
-    !P.queenPlaced ||
-    remainingDrones("W") === 0 ||
-    State.winner
-  )
-    return;
-  State.placeMode = !State.placeMode;
-  redrawAll();
-});
-
-placeBtnB.addEventListener("click", () => {
-  const P = State.placements.B;
-  if (
-    State.turn !== "B" ||
-    !P.queenPlaced ||
-    remainingDrones("B") === 0 ||
-    State.winner
-  )
-    return;
+// UI events (single button)
+placeBtn.addEventListener("click", () => {
+  const me = currentPlayer().id;
+  const P = State.placements[me];
+  if (!P.queenPlaced || remainingDrones(me) === 0 || State.winner) return;
   State.placeMode = !State.placeMode;
   redrawAll();
 });
