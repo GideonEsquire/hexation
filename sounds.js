@@ -2,6 +2,17 @@
 let ctx = null;
 let master = null;
 let comp = null;
+let __muted = false;
+
+export function isMuted() {
+  return __muted;
+}
+
+export function setMuted(m) {
+  __muted = !!m;
+  ensureGraph();
+  master.gain.value = __muted ? 0 : 1;
+}
 
 function ensureGraph() {
   if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();

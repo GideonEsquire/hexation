@@ -11,7 +11,7 @@
 
 <body>
   <div id="ui">
-    <div><strong>Hexation (v0.8, Up to 6 players!? Is that even possible?)</strong></div>
+    <div><strong>Hexation (v0.9, settings)</strong></div>
     <div style="margin-top:6px">Turn: <span id="turn" class="badge">White</span></div>
     <div id="resetWrap" style="margin-top:8px; display:none;">
       <button id="resetBtn" style="background:#2e3440;color:#eceff4;border:none;padding:6px 12px;
@@ -24,17 +24,48 @@
          cursor:pointer;font-weight:600;">
       ❔ Help
     </button>
-
-    <!-- replace the two W/B buttons block with: -->
+    <button id="settingsBtn" style="margin-top:8px;background:#2e3440;color:#eceff4;
+          border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600;">
+      ⚙ Settings
+    </button>
     <div id="placeControls" style="margin-top:8px; display:flex; gap:8px; align-items:center;">
       <div class="pc-label">Place Drone:</div>
-      <button id="placeBtn" class="pc-btn" title="Place/stack toggle">Place <span id="remCur"
+      <button id="placeBtn" class="pc-btn" title="Place/stack toggle">Drone <span id="remCur"
           class="pc-rem">(0)</span></button>
     </div>
   </div>
 
-  <div id="helpBackdrop" class="help-backdrop" aria-hidden="true"></div>
+  <div id="settingsBackdrop" class="settings-backdrop" aria-hidden="true"></div>
 
+  <div id="settingsDialog" class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle"
+    aria-describedby="settingsContent" tabindex="-1">
+    <div class="help-card">
+      <button id="settingsClose" class="help-close" aria-label="Close settings">✕</button>
+      <div class="help-header">
+        <div class="help-icon">⚙</div>
+        <h2 id="settingsTitle">Settings</h2>
+      </div>
+      <div id="settingsContent" class="help-body">
+        <label style="display:flex;align-items:center;gap:10px;margin:8px 0;">
+          <input id="setAnimateBg" type="checkbox" />
+          Animate background
+        </label>
+
+        <label style="display:flex;align-items:center;gap:10px;margin:8px 0;">
+          <input id="setMute" type="checkbox" />
+          Mute sound
+        </label>
+
+        <label style="display:flex;align-items:center;gap:10px;margin:8px 0;">
+          <span style="min-width:140px;">Number of players</span>
+          <input id="setPlayers" type="range" min="2" max="6" step="1" style="flex:1;" />
+          <span id="setPlayersVal" style="width:24px;text-align:right;">2</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div id="helpBackdrop" class="help-backdrop" aria-hidden="true"></div>
   <div id="helpDialog" class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="helpTitle"
     aria-describedby="helpContent" tabindex="-1">
     <div class="help-card">
@@ -51,12 +82,11 @@
           <li><b>Drones:</b> move up to their stack height, jump friendlies, merge ≤ 5.</li>
           <li><b>Center:</b> landing a Drone upgrades it to max (5).</li>
         </ul>
-        <div class="help-tip">Tip: Use the W/B buttons to toggle Drone placement.</div>
+        <div class="help-tip">Tip: Use the <b>Drone</b> button to toggle Drone placement.</div>
       </div>
     </div>
   </div>
 
-  <!-- p5.js v2 (pin to current 2.0.5) -->
   <script src="https://cdn.jsdelivr.net/npm/p5@2.0.5/lib/p5.min.js"></script>
   <script type="module" src="./main.js"></script>
 </body>

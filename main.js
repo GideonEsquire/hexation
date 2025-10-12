@@ -27,6 +27,14 @@ import {
   drawBackgroundTriangles,
   stepBackgroundAnimation,
 } from "./background.js";
+import {
+  initSettingsUI,
+  getSettings,
+  applySettings,
+  __wireSetPlayerCount,
+} from "./settings.js";
+
+__wireSetPlayerCount(setPlayerCount);
 
 let ambientTimer = null;
 function startAmbientTicker() {
@@ -37,6 +45,13 @@ function startAmbientTicker() {
       if (typeof redraw === "function") redraw();
     }
   }, 100);
+}
+
+function stopAmbientTicker() {
+  if (ambientTimer) {
+    clearInterval(ambientTimer);
+    ambientTimer = null;
+  }
 }
 
 let canvasW, canvasH, centerX, centerY;
@@ -119,6 +134,21 @@ window.setup = async function setup() {
   gfx = createCanvas(window.innerWidth, window.innerHeight); // store handle
   configureCanvas();
 
+  // Settings UI
+  initSettingsUI((s) => {
+    // Start/stop ambient frames based on animateBg
+    if (s.animateBg) startAmbientTicker();
+    else stopAmbientTicker();
+    // If player count changed (and you wired setPlayerCount), state was reset.
+    // Refresh UI and redraw either way:
+    updateTurnUI(State);
+    safeRedraw();
+  });
+
+  const s = getSettings();
+  if (s.animateBg) startAmbientTicker();
+  else stopAmbientTicker();
+
   resetState();
   noLoop();
   updateTurnUI(State);
@@ -139,7 +169,7 @@ window.windowResized = function windowResized() {
       // keep the app alive; log for debugging
       console.warn("Resize error:", e);
     }
-  }, 60); // ~1–2 frames worth; tweak if you like
+  }, 360); // ~1–2 frames worth; tweak if you like
 };
 
 // Map touch to mouse, so mobile taps work everywhere
@@ -177,7 +207,6 @@ window.draw = function draw() {
     pop();
   }
   if (State.winner && !Celebration.active) {
-    // freeze on the final celebratory frame
     noLoop();
   }
   stepBackgroundAnimation(0.01);
@@ -192,7 +221,6 @@ window.mousePressed = function mousePressed() {
   const P = State.placements[me];
   const occ = getPiece(a.q, a.r);
 
-  // deselect if re-click
   if (State.selected && State.selected.q === a.q && State.selected.r === a.r) {
     State.selected = null;
     State.legalMoves = [];

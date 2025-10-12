@@ -216,3 +216,29 @@ canvas {
 
 /* keep existing .pc-btn; optionally tint when active */
 .pc-btn.active { outline: 3px solid #a3be8c; }
+
+/* Reuse help modal styling */
+.settings-backdrop { composes: help-backdrop; }
+.settings-dialog   { composes: help-dialog; }
+
+/* If your build doesn't support 'composes', just duplicate selectors: */
+.settings-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(15,17,21,0.55);
+  backdrop-filter: blur(6px);
+  opacity: 0; pointer-events: none;
+  transition: opacity .22s ease;
+  z-index: 900;
+}
+.settings-dialog {
+  position: fixed; inset: 0;
+  display: grid; place-items: center;
+  pointer-events: none; z-index: 901;
+  opacity: 0; transform: translateY(8px) scale(.98);
+  transition: opacity .22s ease, transform .22s ease;
+}
+.settings-dialog.open,
+.settings-backdrop.open {
+  opacity: 1; pointer-events: auto;
+}
+.settings-dialog.open { transform: translateY(0) scale(1); }

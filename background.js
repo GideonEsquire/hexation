@@ -3,6 +3,11 @@
 // Smoothly tweens between two Nord colors using Perlin noise.
 
 let animPhase = 0;
+let animateEnabled = true;
+
+export function setAnimateBackground(on) {
+  animateEnabled = !!on;
+}
 
 /**
  * @param {number} hexSize      - same HEX_SIZE as your board
@@ -70,5 +75,6 @@ function drawHexAsTriangles(cx, cy, size, phase, colorA, colorB) {
 
 /** Call once per frame to slowly animate color drift */
 export function stepBackgroundAnimation(speed = 0.0005) {
+  if (!animateEnabled) return;
   animPhase += speed;
 }
